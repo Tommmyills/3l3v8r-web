@@ -182,6 +182,17 @@ Track your learning journey with a personalized profile:
 - **Persistent Storage** - All data saved locally with AsyncStorage
 - **Profile Management** - Edit name, change avatar, or reset profile anytime
 
+### Favorites & Watch History ❤️
+Quick access to your saved videos without searching again:
+- **Favorite Videos** - Tap the heart icon on any video to save it for later
+- **Recently Watched** - Automatically tracks videos you watch for easy replay
+- **Quick Load** - Tap any favorite or recent video to instantly load it
+- **Thumbnail Previews** - Visual preview of each saved video
+- **Badge Counter** - See how many favorites you have at a glance in the header
+- **Two Tabs** - Switch between Favorites and Recent history
+- **Persistent Storage** - Favorites saved locally (up to 50 videos)
+- **Easy Management** - Remove individual favorites or clear all at once
+
 ### Premium Design Elements
 - **TE Color Palette**:
   - Background: #0E0E0E
@@ -476,6 +487,7 @@ Track your learning journey with a personalized profile:
 │   │   ├── TranscriptScreen.tsx    # Video transcript viewer with AI features
 │   │   ├── ActionStepsScreen.tsx   # AI-generated lesson breakdown viewer (steps + teachings)
 │   │   ├── ProfileScreen.tsx       # User profile and stats screen
+│   │   ├── FavoritesScreen.tsx     # Favorites and watch history screen
 │   ├── components/
 │   │   ├── NotesModal.tsx          # AI-powered note-taking modal
 │   │   ├── VoiceAssistModal.tsx    # Text Translator configuration modal
@@ -490,6 +502,7 @@ Track your learning journey with a personalized profile:
 │   │   ├── profileStore.ts         # Profile store with AsyncStorage persistence
 │   │   ├── voiceAssistStore.ts     # Text Translator settings with AsyncStorage persistence
 │   │   ├── actionStepsStore.ts     # Lesson Breakdown cache with AsyncStorage persistence
+│   │   ├── favoritesStore.ts       # Favorites & watch history with AsyncStorage persistence
 │   ├── utils/
 │   │   ├── audioMixer.ts           # External audio mixer engine
 │   │   ├── speechDetector.ts      # Speech detection for auto-duck

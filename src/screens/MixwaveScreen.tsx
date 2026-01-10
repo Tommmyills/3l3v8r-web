@@ -43,6 +43,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import { AudioVisualizer } from "../components/AudioVisualizer";
 import { VoiceAssistModal } from "../components/VoiceAssistModal";
 import { useVoiceAssistStore } from "../state/voiceAssistStore";
+import { FavoritesScreen } from "./FavoritesScreen";
+import { useFavoritesStore } from "../state/favoritesStore";
 
 type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | null;
 
@@ -113,6 +115,13 @@ export const MixwaveScreen: React.FC = () => {
   const [showVoiceAssist, setShowVoiceAssist] = useState(false);
   const voiceAssistEnabled = useVoiceAssistStore((s) => s.voiceAssistEnabled);
 
+  // Favorites State
+  const [showFavorites, setShowFavorites] = useState(false);
+  const addFavorite = useFavoritesStore((s) => s.addFavorite);
+  const removeFavorite = useFavoritesStore((s) => s.removeFavorite);
+  const isFavorite = useFavoritesStore((s) => s.isFavorite);
+  const addToRecentlyWatched = useFavoritesStore((s) => s.addToRecentlyWatched);
+  const favoritesCount = useFavoritesStore((s) => s.favorites.length);
 
   // Track Player State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -121,6 +130,11 @@ export const MixwaveScreen: React.FC = () => {
 
   // Video error state
   const [videoError, setVideoError] = useState(false);
+
+  // Video title tracking for favorites
+  const [currentVideoTitle, setCurrentVideoTitle] = useState<string>("");
+  const [currentChannelTitle, setCurrentChannelTitle] = useState<string>("");
+  const [currentThumbnail, setCurrentThumbnail] = useState<string>("");
 
   // Video loading state
   const [videoLoading, setVideoLoading] = useState(false);
@@ -675,6 +689,41 @@ export const MixwaveScreen: React.FC = () => {
     Alert.alert("Saved!", "Your mix has been saved to your profile");
   };
 
+  // Toggle favorite for current video
+  const handleToggleFavorite = () => {
+    if (!mainVideo.videoId) return;
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    if (isFavorite(mainVideo.videoId)) {
+      removeFavorite(mainVideo.videoId);
+    } else {
+      addFavorite({
+        videoId: mainVideo.videoId,
+        title: currentVideoTitle || "Tutorial Video",
+        channelTitle: currentChannelTitle || "Unknown Channel",
+        thumbnail: currentThumbnail || `https://img.youtube.com/vi/${mainVideo.videoId}/mqdefault.jpg`,
+      });
+    }
+  };
+
+  // Handle selecting a video from favorites
+  const handleSelectFromFavorites = (videoId: string, title: string) => {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    setMainVideoUrl(url, videoId);
+    setCurrentVideoTitle(title);
+    setCurrentThumbnail(`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`);
+    setVideoError(false);
+
+    // Add to recently watched
+    addToRecentlyWatched({
+      videoId,
+      title,
+      channelTitle: currentChannelTitle || "Unknown Channel",
+      thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+    });
+  };
+
   // Update volume for local audio
   useEffect(() => {
     if (audioRef.current && musicSource === "local") {
@@ -962,6 +1011,38 @@ export const MixwaveScreen: React.FC = () => {
                 }}
               >
                 <Ionicons name="save-outline" size={16} color={modeColors.accent} />
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setShowFavorites(true);
+                }}
+                className="border p-2 rounded-xl relative"
+                style={{
+                  borderColor: "rgba(255,255,255,0.15)",
+                  backgroundColor: "rgba(255,255,255,0.03)",
+                  shadowColor: modeColors.glow,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                }}
+              >
+                <Ionicons name="heart" size={16} color={modeColors.accent} />
+                {favoritesCount > 0 && (
+                  <View
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full items-center justify-center"
+                    style={{
+                      backgroundColor: modeColors.accent,
+                    }}
+                  >
+                    <Text
+                      className="text-white font-bold"
+                      style={{ fontSize: 9, fontFamily: "monospace" }}
+                    >
+                      {favoritesCount > 9 ? "9+" : favoritesCount}
+                    </Text>
+                  </View>
+                )}
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -1468,10 +1549,27 @@ export const MixwaveScreen: React.FC = () => {
                       </Text>
                     </Pressable>
                     <Pressable
+                      onPress={handleToggleFavorite}
+                      className="border p-2.5 rounded-2xl"
+                      style={{
+                        borderColor: isFavorite(mainVideo.videoId) ? modeColors.accent : "rgba(255,255,255,0.1)",
+                        backgroundColor: isFavorite(mainVideo.videoId) ? `${modeColors.accent}15` : "rgba(255,255,255,0.03)",
+                      }}
+                    >
+                      <Ionicons
+                        name={isFavorite(mainVideo.videoId) ? "heart" : "heart-outline"}
+                        size={16}
+                        color={isFavorite(mainVideo.videoId) ? modeColors.accent : "#999"}
+                      />
+                    </Pressable>
+                    <Pressable
                       onPress={() => {
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         clearMainVideo();
                         setTutorialExpanded(false);
+                        setCurrentVideoTitle("");
+                        setCurrentChannelTitle("");
+                        setCurrentThumbnail("");
                       }}
                       className="border px-4 py-2.5 rounded-2xl"
                       style={{
@@ -2511,6 +2609,16 @@ export const MixwaveScreen: React.FC = () => {
         {showProfile && (
           <View className="absolute inset-0" style={{ zIndex: 100 }}>
             <ProfileScreen onClose={() => setShowProfile(false)} />
+          </View>
+        )}
+
+        {/* Favorites Screen Modal */}
+        {showFavorites && (
+          <View className="absolute inset-0" style={{ zIndex: 100 }}>
+            <FavoritesScreen
+              onClose={() => setShowFavorites(false)}
+              onSelectVideo={handleSelectFromFavorites}
+            />
           </View>
         )}
 
