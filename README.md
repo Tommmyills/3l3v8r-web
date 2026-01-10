@@ -2,30 +2,6 @@
 
 A beautifully designed mobile app inspired by Teenage Engineering's aesthetic, combining dual YouTube playback with multiple audio sources. Perfect for learning, studying, or any scenario where you want to mix audio from different sources.
 
-## NEW: Dual UI Modes 🎮
-
-3L3V8R now features **two distinct interface modes** that you can toggle between:
-
-### Classic Mode
-The original, full-featured interface with all controls and settings visible. Perfect for power users who want complete control over their audio mixing experience.
-
-### Console Mode (Operator Mode)
-A **physical device-inspired interface** that transforms your screen into a retro-future electronic instrument:
-- **Physical device aesthetic** - Your phone becomes a Teenage Engineering-style pocket operator
-- **Big center dial** - Massive glowing control dial for master gain
-- **Synthwave colors** - Uses the same beautiful color palette from your audio modes
-- **Bulky tactile controls** - Large, satisfying buttons and switches
-- **Circuit-bent design** - Inspired by retro music gear, Gameboy, and PSP layouts
-- **Mode selection buttons** - Quick-access physical buttons at the bottom
-- **Glowing borders** - Dynamic neon glow that pulses with your selected mode
-- **Minimal text** - Clean, focused operator interface
-- **Serial number branding** - "3L3V8R-CONSOLE" with mode indicator
-
-**Toggle between modes:** Use the glowing capsule switch at the top of the screen
-- Instantly swaps the entire UI layout (no reload needed)
-- Your preference is automatically saved and persists across sessions
-- Both modes control the same underlying audio system
-
 ## Design Philosophy
 
 3L3V8R features a **Teenage Engineering (OP-1/OP-Z/PO-Series) aesthetic** with:
@@ -494,7 +470,6 @@ Track your learning journey with a personalized profile:
 ├── src/
 │   ├── screens/
 │   │   ├── MixwaveScreen.tsx       # Main TE-styled screen with mixer and YouTube browser
-│   │   ├── ConsoleModeScreen.tsx   # Console Mode - Physical device UI with big dial
 │   │   ├── SplashScreen.tsx        # Animated splash screen with neon glow
 │   │   ├── SettingsScreen.tsx      # Settings and preferences screen
 │   │   ├── NotesScreen.tsx         # Session notes display screen
@@ -505,8 +480,6 @@ Track your learning journey with a personalized profile:
 │   │   ├── NotesModal.tsx          # AI-powered note-taking modal
 │   │   ├── VoiceAssistModal.tsx    # Text Translator configuration modal
 │   │   ├── AudioVisualizer.tsx     # Animated audio visualizer component
-│   │   ├── UIModeToggle.tsx        # Classic/Console mode toggle switch
-│   │   └── ConsoleModeLayout.tsx   # Console Mode wrapper component
 │   ├── api/
 │   │   ├── youtube-search.ts       # YouTube Data API v3 integration
 │   │   ├── youtube-transcript.ts   # Reliable transcript extraction using youtube-caption-extractor
@@ -517,7 +490,6 @@ Track your learning journey with a personalized profile:
 │   │   ├── profileStore.ts         # Profile store with AsyncStorage persistence
 │   │   ├── voiceAssistStore.ts     # Text Translator settings with AsyncStorage persistence
 │   │   ├── actionStepsStore.ts     # Lesson Breakdown cache with AsyncStorage persistence
-│   │   └── uiModeStore.ts          # UI mode (Classic/Console) with AsyncStorage persistence
 │   ├── utils/
 │   │   ├── audioMixer.ts           # External audio mixer engine
 │   │   ├── speechDetector.ts      # Speech detection for auto-duck

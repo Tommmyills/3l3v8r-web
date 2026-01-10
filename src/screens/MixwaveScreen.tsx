@@ -43,10 +43,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { AudioVisualizer } from "../components/AudioVisualizer";
 import { VoiceAssistModal } from "../components/VoiceAssistModal";
 import { useVoiceAssistStore } from "../state/voiceAssistStore";
-import { UIModeToggle } from "../components/UIModeToggle";
-import { useUIModeStore } from "../state/uiModeStore";
-import { ConsoleModeLayout } from "../components/ConsoleModeLayout";
-import { ConsoleModeScreen } from "./ConsoleModeScreen";
 
 type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | null;
 
@@ -117,9 +113,6 @@ export const MixwaveScreen: React.FC = () => {
   const [showVoiceAssist, setShowVoiceAssist] = useState(false);
   const voiceAssistEnabled = useVoiceAssistStore((s) => s.voiceAssistEnabled);
 
-  // UI Mode State
-  const uiMode = useUIModeStore((s) => s.uiMode);
-  const setUIMode = useUIModeStore((s) => s.setUIMode);
 
   // Track Player State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -850,12 +843,6 @@ export const MixwaveScreen: React.FC = () => {
   });
 
   return (
-    <>
-      {/* Console Mode - Completely separate UI */}
-      {uiMode === "console" && <ConsoleModeScreen />}
-
-      {/* Classic Mode - Original UI (only render when in classic mode) */}
-      {uiMode === "classic" && (
     <View className="flex-1">
       <LinearGradient
         colors={["#151923", "#251433", "#18132A"]}
@@ -876,14 +863,6 @@ export const MixwaveScreen: React.FC = () => {
           >
             {/* Header with Branding */}
             <View className="px-6 pt-8 pb-4 border-b" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
-          {/* UI Mode Toggle - Top Center */}
-          <View className="items-center mb-4">
-            <UIModeToggle
-              mode={uiMode}
-              onToggle={setUIMode}
-              accentColor={modeColors.accent}
-            />
-          </View>
 
           <View className="flex-row items-center justify-between mb-4">
             <View>
@@ -2910,7 +2889,5 @@ export const MixwaveScreen: React.FC = () => {
       </AnimatedView>
     </LinearGradient>
     </View>
-      )}
-    </>
   );
 };
