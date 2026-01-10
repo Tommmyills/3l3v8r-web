@@ -136,15 +136,26 @@ export async function fetchYoutubeTranscript(
       console.log("❌ METHOD 2 failed:", error?.message || "Unknown error");
     }
 
-    // All methods failed
-    console.log("❌ ALL METHODS FAILED - No transcript available for this video");
-    throw new Error("No captions found for this video. The video may not have subtitles available or they may be disabled.");
+    // All methods failed - this is an expected case for videos without captions
+    console.log("⚠️ No transcript available for this video (captions may be disabled or unavailable)");
+    return {
+      segments: [],
+      fullText: "",
+      language: languageCode,
+      videoId,
+      source: "captions",
+    };
 
   } catch (error) {
-    console.error("💥 Transcript fetch error:", error);
-    throw new Error(
-      error instanceof Error ? error.message : "Failed to fetch transcript"
-    );
+    // Log without using console.error to avoid noisy stack traces for expected failures
+    console.log("⚠️ Transcript fetch issue:", error instanceof Error ? error.message : "Unknown error");
+    return {
+      segments: [],
+      fullText: "",
+      language: languageCode,
+      videoId,
+      source: "captions",
+    };
   }
 }
 

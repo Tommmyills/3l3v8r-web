@@ -207,11 +207,17 @@ export const TranscriptScreen: React.FC<TranscriptScreenProps> = ({
       setLoading(true);
       setError(null);
       const result = await fetchYoutubeTranscript(videoId);
-      setTranscript(result);
+
+      // Check if we got an empty transcript (no captions available)
+      if (!result.segments || result.segments.length === 0) {
+        setError("No captions available for this video");
+        setTranscript(null);
+      } else {
+        setTranscript(result);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to load transcript";
       setError(errorMessage);
-      // Don't show Alert - let the UI display the error gracefully
     } finally {
       setLoading(false);
     }
