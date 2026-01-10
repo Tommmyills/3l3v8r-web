@@ -5,11 +5,16 @@
  * Method 1: youtube-caption-extractor (fast)
  * Method 2: youtube-transcript package (reliable fallback)
  * Caches transcripts locally for instant loading on repeat visits
+ *
+ * NOTE: Uses dynamic imports to prevent crashes on app startup
+ * The youtube packages use Node.js APIs that can crash on some iOS versions
  */
 
-import { getSubtitles } from "youtube-caption-extractor";
-import { YoutubeTranscript } from "youtube-transcript";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Lazy-loaded modules - prevents crash on app startup
+let getSubtitles: typeof import("youtube-caption-extractor").getSubtitles | null = null;
+let YoutubeTranscript: typeof import("youtube-transcript").YoutubeTranscript | null = null;
 
 // Cache configuration
 const CACHE_PREFIX = "transcript_";
@@ -175,6 +180,17 @@ async function tryYoutubeCaptionExtractor(
   videoId: string,
   languageCode: string
 ): Promise<TranscriptResult | null> {
+  // Lazy load the module on first use
+  if (!getSubtitles) {
+    try {
+      const module = await import("youtube-caption-extractor");
+      getSubtitles = module.getSubtitles;
+    } catch (e) {
+      console.log("Failed to load youtube-caption-extractor:", e);
+      return null;
+    }
+  }
+
   const captions = await getSubtitles({
     videoID: videoId,
     lang: languageCode
@@ -207,6 +223,17 @@ async function tryYoutubeCaptionExtractor(
 async function tryYoutubeTranscriptPackage(
   videoId: string
 ): Promise<TranscriptResult | null> {
+  // Lazy load the module on first use
+  if (!YoutubeTranscript) {
+    try {
+      const module = await import("youtube-transcript");
+      YoutubeTranscript = module.YoutubeTranscript;
+    } catch (e) {
+      console.log("Failed to load youtube-transcript:", e);
+      return null;
+    }
+  }
+
   const transcript = await YoutubeTranscript.fetchTranscript(videoId);
 
   if (!transcript || transcript.length === 0) {
