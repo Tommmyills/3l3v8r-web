@@ -3,17 +3,21 @@ const { defineConfig } = require("eslint/config");
 const expoConfig = require("eslint-config-expo/flat");
 
 module.exports = defineConfig([
-  expoConfig,
   {
     ignores: [
-      "dist/*",
+      "dist/**",
+      "**/dist/**",
+      "3l3v8r-web/**",
       "index.ts",
       "rootStore.example.ts",
       "nativewind-env.d.ts",
-      "patches/*",
+      "patches/**",
       "bun.lock",
       "eslint.config.js",
     ],
+  },
+  expoConfig,
+  {
     settings: {
       "import/resolver": {
         typescript: {
