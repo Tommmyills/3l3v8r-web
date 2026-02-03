@@ -85,7 +85,7 @@ async function getCachedTranscript(videoId: string): Promise<TranscriptResult | 
 /**
  * Cache transcript to AsyncStorage
  */
-async function cacheTranscript(videoId: string, transcript: TranscriptResult): Promise<void> {
+export async function cacheTranscript(videoId: string, transcript: TranscriptResult): Promise<void> {
   try {
     const cacheKey = `${CACHE_PREFIX}${videoId}`;
     const cached: CachedTranscript = {

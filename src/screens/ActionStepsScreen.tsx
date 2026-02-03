@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -26,11 +26,12 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { fetchYoutubeTranscript, clearTranscriptCacheForVideo } from "../api/youtube-transcript";
+import { fetchYoutubeTranscript, clearTranscriptCacheForVideo, TranscriptResult, cacheTranscript } from "../api/youtube-transcript";
 import { generateLessonBreakdown, LessonBreakdown } from "../api/transcript-ai";
 import { useLessonBreakdownStore } from "../state/actionStepsStore";
 import { useAppStore } from "../state/appStore";
 import { getOpenAIClient } from "../api/openai";
+import { TranscriptWebView } from "../components/TranscriptWebView";
 
 interface ActionStepsScreenProps {
   videoId: string;
@@ -57,8 +58,13 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
 
   // State
   const [loading, setLoading] = useState(true);
+  const [loadingStatus, setLoadingStatus] = useState("Fetching transcript...");
   const [error, setError] = useState<string | null>(null);
   const [lessonBreakdown, setLessonBreakdown] = useState<LessonBreakdown | null>(null);
+
+  // WebView fallback state
+  const [useWebViewFallback, setUseWebViewFallback] = useState(false);
+  const [webViewAttempted, setWebViewAttempted] = useState(false);
 
   // Q&A Modal State
   const [showQAModal, setShowQAModal] = useState(false);
@@ -66,6 +72,41 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
   const [question, setQuestion] = useState("");
   const [aiResponse, setAiResponse] = useState("");
   const [askingAI, setAskingAI] = useState(false);
+
+  // Handle WebView transcript result
+  const handleWebViewTranscript = useCallback(async (transcript: TranscriptResult | null) => {
+    if (!transcript || !transcript.segments || transcript.segments.length < 5) {
+      setError("Could not fetch transcript via WebView. This video may not have captions available.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      console.log("WebView transcript received:", transcript.segments.length, "segments");
+      setLoadingStatus("Generating action steps...");
+
+      // Cache the transcript for future use
+      await cacheTranscript(videoId, transcript);
+
+      // Generate lesson breakdown
+      const fullText = transcript.segments.map((s) => s.text).join(" ");
+      const breakdown = await generateLessonBreakdown(fullText, videoTitle);
+
+      setLessonBreakdown(breakdown);
+      saveLessonBreakdown(videoId, videoTitle, breakdown);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error generating breakdown from WebView transcript:", err);
+      setError(err instanceof Error ? err.message : "Failed to generate lesson breakdown");
+      setLoading(false);
+    }
+  }, [videoId, videoTitle, saveLessonBreakdown]);
+
+  const handleWebViewError = useCallback((errorMsg: string) => {
+    console.log("WebView transcript error:", errorMsg);
+    setError("Could not fetch transcript. This video may not have captions available, or YouTube is blocking access.");
+    setLoading(false);
+  }, []);
 
   // Check if we already have cached lesson breakdown
   useEffect(() => {
@@ -81,6 +122,7 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
 
         // Fetch transcript
         setLoading(true);
+        setLoadingStatus("Fetching transcript...");
         let transcriptResult = await fetchYoutubeTranscript(videoId);
 
         // Check if we got a valid transcript (at least 5 segments with meaningful content)
@@ -96,6 +138,21 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
           transcriptResult = await fetchYoutubeTranscript(videoId);
         }
 
+        // Check again after retry
+        const isValidAfterRetry = transcriptResult &&
+          transcriptResult.segments &&
+          transcriptResult.segments.length >= 5 &&
+          transcriptResult.fullText.length > 200;
+
+        // If still no valid transcript, try WebView fallback
+        if (!isValidAfterRetry && !webViewAttempted) {
+          console.log("Standard methods failed, trying WebView fallback...");
+          setLoadingStatus("Trying alternative method...");
+          setWebViewAttempted(true);
+          setUseWebViewFallback(true);
+          return; // WebView will call handleWebViewTranscript when done
+        }
+
         if (!transcriptResult || !transcriptResult.segments || transcriptResult.segments.length === 0) {
           throw new Error("YouTube is currently blocking transcript access. This is a temporary issue affecting all transcript services. Please try again later or try a different video.");
         }
@@ -105,6 +162,7 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
         }
 
         // Generate lesson breakdown
+        setLoadingStatus("Generating action steps...");
         const fullText = transcriptResult.segments.map((s) => s.text).join(" ");
         const breakdown = await generateLessonBreakdown(fullText, videoTitle);
 
@@ -119,7 +177,7 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
     };
 
     loadLessonBreakdown();
-  }, [videoId, videoTitle]);
+  }, [videoId, videoTitle, webViewAttempted]);
 
   // Pan gesture for swipe down to dismiss
   const panGesture = Gesture.Pan()
@@ -253,6 +311,15 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
           animatedStyle,
         ]}
       >
+        {/* Hidden WebView for transcript fetching */}
+        {useWebViewFallback && (
+          <TranscriptWebView
+            videoId={videoId}
+            onTranscriptFetched={handleWebViewTranscript}
+            onError={handleWebViewError}
+          />
+        )}
+
         {/* Header */}
         <View className="px-6 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
           <View className="flex-row items-center justify-between mb-2">
@@ -324,7 +391,7 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
                 className="text-gray-400 text-sm mt-4"
                 style={{ letterSpacing: 0.5, fontFamily: "monospace" }}
               >
-                Analyzing tutorial...
+                {loadingStatus}
               </Text>
             </View>
           )}
