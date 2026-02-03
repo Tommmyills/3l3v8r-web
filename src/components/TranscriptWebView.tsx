@@ -1,9 +1,9 @@
 /**
  * TranscriptWebView - Fetches YouTube transcripts using a hidden WebView
- * Uses YouTube's own player to display captions, then scrapes them from the DOM
+ * Uses YouTube's mobile site and multiple extraction methods
  */
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { View } from "react-native";
 import { WebView } from "react-native-webview";
 import { TranscriptResult } from "../api/youtube-transcript";
@@ -14,12 +14,16 @@ interface TranscriptWebViewProps {
   onError: (error: string) => void;
 }
 
-// Script to extract transcript from YouTube's transcript panel (not the timedtext API)
+// Script to extract transcript - tries multiple methods
 const FETCH_TRANSCRIPT_JS = `
 (function() {
   try {
-    window._transcriptAttempted = false;
-    window._foundSegments = [];
+    if (window._transcriptStarted) return;
+    window._transcriptStarted = true;
+
+    const log = (msg) => {
+      console.log('[TranscriptWebView] ' + msg);
+    };
 
     const decodeHtmlEntities = (text) => {
       const textarea = document.createElement('textarea');
@@ -27,222 +31,267 @@ const FETCH_TRANSCRIPT_JS = `
       return textarea.value;
     };
 
-    // Method 1: Try to open the transcript panel and scrape it
-    const tryTranscriptPanel = async () => {
-      // Look for "More actions" or "..." button
-      const moreButton = document.querySelector('button[aria-label="More actions"]') ||
-                         document.querySelector('ytd-menu-renderer button') ||
-                         document.querySelector('#menu button');
+    const parseXMLCaptions = (xmlText) => {
+      const segments = [];
+      // Try multiple regex patterns
+      const patterns = [
+        /<text start="([\\d.]+)" dur="([\\d.]+)"[^>]*>([\\s\\S]*?)<\\/text>/gi,
+        /<text start='([\\d.]+)' dur='([\\d.]+)'[^>]*>([\\s\\S]*?)<\\/text>/gi,
+      ];
 
-      if (moreButton) {
-        moreButton.click();
-        await new Promise(r => setTimeout(r, 500));
-
-        // Look for "Show transcript" option
-        const menuItems = document.querySelectorAll('ytd-menu-service-item-renderer, tp-yt-paper-item');
-        for (const item of menuItems) {
-          if (item.textContent && item.textContent.toLowerCase().includes('transcript')) {
-            item.click();
-            await new Promise(r => setTimeout(r, 1500));
-
-            // Now scrape the transcript panel
-            const transcriptItems = document.querySelectorAll('ytd-transcript-segment-renderer, .ytd-transcript-segment-renderer');
-            if (transcriptItems.length > 0) {
-              const segments = [];
-              transcriptItems.forEach((item, idx) => {
-                const timeEl = item.querySelector('.segment-timestamp, [class*="timestamp"]');
-                const textEl = item.querySelector('.segment-text, [class*="text"]');
-                if (textEl) {
-                  const timeText = timeEl ? timeEl.textContent.trim() : '0:00';
-                  const parts = timeText.split(':').map(Number);
-                  let seconds = 0;
-                  if (parts.length === 2) seconds = parts[0] * 60 + parts[1];
-                  if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-
-                  segments.push({
-                    text: decodeHtmlEntities(textEl.textContent.trim()),
-                    start: seconds,
-                    duration: 5
-                  });
-                }
-              });
-
-              if (segments.length > 0) {
-                return segments;
-              }
-            }
-            break;
+      for (const regex of patterns) {
+        let match;
+        while ((match = regex.exec(xmlText)) !== null) {
+          const text = decodeHtmlEntities(match[3].replace(/<[^>]+>/g, '')).trim();
+          if (text.length > 0) {
+            segments.push({
+              text: text,
+              start: parseFloat(match[1]),
+              duration: parseFloat(match[2])
+            });
           }
         }
+        if (segments.length > 0) break;
       }
-      return null;
+      return segments;
     };
 
-    // Method 2: Parse captions from ytInitialPlayerResponse and use XMLHttpRequest
-    const tryDirectFetch = async () => {
+    const parseJSONCaptions = (text) => {
+      try {
+        const json = JSON.parse(text);
+        if (json.events) {
+          return json.events
+            .filter(e => e.segs && e.segs.length > 0)
+            .map(e => ({
+              text: e.segs.map(s => s.utf8 || '').join('').trim(),
+              start: (e.tStartMs || 0) / 1000,
+              duration: (e.dDurationMs || 0) / 1000
+            }))
+            .filter(s => s.text.length > 0);
+        }
+      } catch (e) {}
+      return [];
+    };
+
+    const fetchWithTimeout = async (url, options = {}, timeout = 10000) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        return response;
+      } catch (e) {
+        clearTimeout(id);
+        throw e;
+      }
+    };
+
+    // Method 1: Extract caption URL from page and fetch
+    const tryDirectCaptionFetch = async () => {
+      log('Trying direct caption fetch...');
+
       let captionTracks = null;
 
-      // Try window.ytInitialPlayerResponse
+      // Look in ytInitialPlayerResponse
       if (window.ytInitialPlayerResponse) {
-        const captions = window.ytInitialPlayerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-        if (captions) captionTracks = captions;
+        captionTracks = window.ytInitialPlayerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        log('Found ytInitialPlayerResponse, captionTracks: ' + (captionTracks ? captionTracks.length : 'none'));
       }
 
-      // Search in script tags if not found
+      // Search in page source
       if (!captionTracks) {
-        const scripts = document.querySelectorAll('script');
-        for (const script of scripts) {
-          const content = script.textContent || '';
-          const match = content.match(/"captionTracks":\\s*(\\[[^\\]]+\\])/);
-          if (match) {
-            try {
-              captionTracks = JSON.parse(match[1]);
-              break;
-            } catch (e) {}
+        const pageSource = document.documentElement.innerHTML;
+        const match = pageSource.match(/"captionTracks":\\s*(\\[[^\\]]+\\])/);
+        if (match) {
+          try {
+            captionTracks = JSON.parse(match[1]);
+            log('Found captionTracks in page source: ' + captionTracks.length);
+          } catch (e) {
+            log('Failed to parse captionTracks: ' + e.message);
           }
         }
       }
 
       if (!captionTracks || captionTracks.length === 0) {
+        log('No caption tracks found');
         return null;
       }
 
-      const track = captionTracks.find(t => t.languageCode === 'en' || t.languageCode?.startsWith('en')) || captionTracks[0];
-      if (!track || !track.baseUrl) return null;
+      // Find English track or use first available
+      const track = captionTracks.find(t =>
+        t.languageCode === 'en' ||
+        t.languageCode?.startsWith('en-')
+      ) || captionTracks[0];
 
-      // Try with XMLHttpRequest (different request handling than fetch)
-      const tryXHR = (url) => {
-        return new Promise((resolve) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('GET', url, true);
-          xhr.withCredentials = true;
-          xhr.onreadystatechange = function() {
-            if (xhr.readyState === 4) {
-              if (xhr.status === 200 && xhr.responseText.length > 100) {
-                resolve(xhr.responseText);
-              } else {
-                resolve(null);
-              }
-            }
-          };
-          xhr.onerror = () => resolve(null);
-          xhr.send();
-        });
-      };
+      if (!track?.baseUrl) {
+        log('No valid track URL');
+        return null;
+      }
 
-      // Try various URL formats
-      const urls = [
-        track.baseUrl,
+      log('Found caption track: ' + track.languageCode + ', URL length: ' + track.baseUrl.length);
+
+      // Try fetching the captions
+      const urlVariants = [
         track.baseUrl + '&fmt=json3',
-        track.baseUrl.replace(/&fmt=[^&]+/, '') + '&fmt=json3',
-        track.baseUrl.replace(/&fmt=[^&]+/, '')
+        track.baseUrl,
+        track.baseUrl.replace(/&fmt=[^&]+/g, '') + '&fmt=json3',
+        track.baseUrl.replace(/&fmt=[^&]+/g, ''),
       ];
 
-      for (const url of urls) {
-        const text = await tryXHR(url);
-        if (text) {
-          // Parse JSON format
-          try {
-            const json = JSON.parse(text);
-            if (json.events) {
-              const segments = json.events
-                .filter(e => e.segs && e.segs.length > 0)
-                .map(e => ({
-                  text: e.segs.map(s => s.utf8 || '').join('').trim(),
-                  start: (e.tStartMs || 0) / 1000,
-                  duration: (e.dDurationMs || 0) / 1000
-                }))
-                .filter(s => s.text.length > 0);
-
-              if (segments.length > 0) return segments;
+      for (const url of urlVariants) {
+        try {
+          log('Fetching: ' + url.substring(0, 100) + '...');
+          const response = await fetchWithTimeout(url, {
+            credentials: 'include',
+            headers: {
+              'Accept': '*/*',
             }
-          } catch (e) {}
+          });
 
-          // Parse XML format
-          const xmlRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>([\\s\\S]*?)<\\/text>/g;
-          const segments = [];
-          let match;
-          while ((match = xmlRegex.exec(text)) !== null) {
-            const segText = decodeHtmlEntities(match[3].replace(/<[^>]+>/g, '')).trim();
-            if (segText.length > 0) {
-              segments.push({
-                text: segText,
-                start: parseFloat(match[1]),
-                duration: parseFloat(match[2])
-              });
+          if (response.ok) {
+            const text = await response.text();
+            log('Response length: ' + text.length);
+
+            if (text.length > 50) {
+              // Try JSON first
+              let segments = parseJSONCaptions(text);
+              if (segments.length === 0) {
+                segments = parseXMLCaptions(text);
+              }
+
+              if (segments.length > 0) {
+                log('Successfully parsed ' + segments.length + ' segments');
+                return segments;
+              }
             }
+          } else {
+            log('Fetch failed with status: ' + response.status);
           }
-          if (segments.length > 0) return segments;
+        } catch (e) {
+          log('Fetch error: ' + e.message);
         }
       }
 
       return null;
     };
 
-    // Method 3: Use YouTube's internal API with proper headers
-    const tryInnertubeAPI = async () => {
+    // Method 2: Try YouTube's get_transcript API
+    const tryTranscriptAPI = async () => {
+      log('Trying transcript API...');
+
       const videoId = window.location.href.match(/[?&]v=([^&]+)/)?.[1];
-      if (!videoId) return null;
+      if (!videoId) {
+        log('Could not extract video ID');
+        return null;
+      }
 
       try {
-        const response = await fetch('https://www.youtube.com/youtubei/v1/get_transcript?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            context: {
-              client: {
-                clientName: 'WEB',
-                clientVersion: '2.20240101.00.00'
-              }
+        // Encode video ID for transcript API
+        const params = btoa(String.fromCharCode(10, 11) + videoId);
+
+        const response = await fetchWithTimeout(
+          'https://www.youtube.com/youtubei/v1/get_transcript?prettyPrint=false',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            params: btoa('\\n\\x0b' + videoId)
-          })
-        });
+            credentials: 'include',
+            body: JSON.stringify({
+              context: {
+                client: {
+                  clientName: 'WEB',
+                  clientVersion: '2.20250101.00.00',
+                }
+              },
+              params: params
+            })
+          }
+        );
 
         if (response.ok) {
           const data = await response.json();
-          const cues = data?.actions?.[0]?.updateEngagementPanelAction?.content?.transcriptRenderer?.body?.transcriptBodyRenderer?.cueGroups;
-          if (cues && cues.length > 0) {
-            const segments = cues.map(cue => {
-              const c = cue.transcriptCueGroupRenderer?.cues?.[0]?.transcriptCueRenderer;
-              return {
-                text: c?.cue?.simpleText || '',
-                start: parseInt(c?.startOffsetMs || 0) / 1000,
-                duration: parseInt(c?.durationMs || 0) / 1000
-              };
-            }).filter(s => s.text.length > 0);
+          log('Transcript API response received');
 
-            if (segments.length > 0) return segments;
+          // Parse transcript from response
+          const actions = data?.actions || [];
+          for (const action of actions) {
+            const cueGroups = action?.updateEngagementPanelAction?.content?.transcriptRenderer?.body?.transcriptBodyRenderer?.cueGroups;
+            if (cueGroups && cueGroups.length > 0) {
+              const segments = cueGroups
+                .map(group => {
+                  const cue = group?.transcriptCueGroupRenderer?.cues?.[0]?.transcriptCueRenderer;
+                  if (!cue) return null;
+                  return {
+                    text: cue?.cue?.simpleText || '',
+                    start: parseInt(cue?.startOffsetMs || '0') / 1000,
+                    duration: parseInt(cue?.durationMs || '0') / 1000
+                  };
+                })
+                .filter(s => s && s.text.length > 0);
+
+              if (segments.length > 0) {
+                log('Transcript API returned ' + segments.length + ' segments');
+                return segments;
+              }
+            }
           }
+        } else {
+          log('Transcript API failed: ' + response.status);
         }
       } catch (e) {
-        console.log('Innertube API error:', e);
+        log('Transcript API error: ' + e.message);
+      }
+
+      return null;
+    };
+
+    // Method 3: Look for captions in player config
+    const tryPlayerConfig = async () => {
+      log('Trying player config...');
+
+      const pageSource = document.documentElement.innerHTML;
+
+      // Look for timedtext URL pattern
+      const timedTextMatch = pageSource.match(/timedtext[^"']*v=([^"'&]+)[^"']*/i);
+      if (timedTextMatch) {
+        log('Found timedtext pattern');
+        try {
+          const url = 'https://www.youtube.com/api/timedtext?' + timedTextMatch[0].split('?')[1];
+          const response = await fetchWithTimeout(url, { credentials: 'include' });
+          if (response.ok) {
+            const text = await response.text();
+            const segments = parseXMLCaptions(text);
+            if (segments.length > 0) {
+              return segments;
+            }
+          }
+        } catch (e) {
+          log('Timedtext fetch error: ' + e.message);
+        }
       }
 
       return null;
     };
 
     const attemptAllMethods = async () => {
-      if (window._transcriptAttempted) return;
-      window._transcriptAttempted = true;
+      log('Starting transcript extraction...');
 
-      // Try direct fetch first (fastest)
-      let segments = await tryDirectFetch();
+      // Try direct fetch first
+      let segments = await tryDirectCaptionFetch();
 
-      // If that fails, try Innertube API
-      if (!segments || segments.length === 0) {
-        segments = await tryInnertubeAPI();
+      // Then try transcript API
+      if (!segments || segments.length < 3) {
+        segments = await tryTranscriptAPI();
       }
 
-      // If that fails, try transcript panel
-      if (!segments || segments.length === 0) {
-        segments = await tryTranscriptPanel();
+      // Finally try player config
+      if (!segments || segments.length < 3) {
+        segments = await tryPlayerConfig();
       }
 
-      if (segments && segments.length > 0) {
+      if (segments && segments.length >= 3) {
+        log('Success! Sending ' + segments.length + ' segments');
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'transcript',
           data: {
@@ -253,23 +302,26 @@ const FETCH_TRANSCRIPT_JS = `
           }
         }));
       } else {
+        log('All methods failed');
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'error',
-          message: 'Could not fetch transcript from any source'
+          message: 'Could not extract transcript from YouTube'
         }));
       }
     };
 
-    // Wait for page to fully load
-    const waitAndAttempt = () => {
-      if (document.readyState === 'complete' && (window.ytInitialPlayerResponse || document.querySelector('video'))) {
+    // Wait for page to be ready
+    const checkAndStart = () => {
+      if (document.readyState === 'complete') {
+        log('Page loaded, waiting 2s for player data...');
         setTimeout(attemptAllMethods, 2000);
       } else {
-        setTimeout(waitAndAttempt, 500);
+        log('Waiting for page load...');
+        setTimeout(checkAndStart, 500);
       }
     };
 
-    waitAndAttempt();
+    checkAndStart();
 
   } catch (e) {
     window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -288,15 +340,36 @@ export const TranscriptWebView: React.FC<TranscriptWebViewProps> = ({
 }) => {
   const webViewRef = useRef<WebView>(null);
   const [hasResult, setHasResult] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Set a timeout to fail if WebView takes too long
+  useEffect(() => {
+    timeoutRef.current = setTimeout(() => {
+      if (!hasResult) {
+        console.log("WebView timeout - no response after 20s");
+        setHasResult(true);
+        onError("Transcript fetch timed out");
+      }
+    }, 20000);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [hasResult, onError]);
 
   const handleMessage = useCallback((event: any) => {
     if (hasResult) return;
 
     try {
       const data = JSON.parse(event.nativeEvent.data);
+      console.log("WebView message:", data.type);
 
       if (data.type === "transcript" && data.data) {
         setHasResult(true);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
         console.log("WebView transcript success:", data.data.segments?.length, "segments");
 
         const result: TranscriptResult = {
@@ -310,6 +383,8 @@ export const TranscriptWebView: React.FC<TranscriptWebViewProps> = ({
         onTranscriptFetched(result);
       } else if (data.type === "error") {
         setHasResult(true);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
         console.log("WebView transcript error:", data.message);
         onError(data.message);
       }
@@ -318,6 +393,7 @@ export const TranscriptWebView: React.FC<TranscriptWebViewProps> = ({
     }
   }, [videoId, onTranscriptFetched, onError, hasResult]);
 
+  // Use desktop YouTube for better compatibility
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   return (
@@ -335,21 +411,23 @@ export const TranscriptWebView: React.FC<TranscriptWebViewProps> = ({
         cacheEnabled={true}
         mediaPlaybackRequiresUserAction={true}
         allowsInlineMediaPlayback={false}
-        userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         originWhitelist={["*"]}
         mixedContentMode="always"
+        userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         onError={(e) => {
           console.log("WebView load error:", e.nativeEvent.description);
           if (!hasResult) {
             setHasResult(true);
-            onError("WebView failed to load YouTube");
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            onError("Failed to load YouTube page");
           }
         }}
         onHttpError={(e) => {
           console.log("WebView HTTP error:", e.nativeEvent.statusCode);
           if (e.nativeEvent.statusCode >= 400 && !hasResult) {
             setHasResult(true);
-            onError(`HTTP error: ${e.nativeEvent.statusCode}`);
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            onError(`YouTube returned error ${e.nativeEvent.statusCode}`);
           }
         }}
       />
