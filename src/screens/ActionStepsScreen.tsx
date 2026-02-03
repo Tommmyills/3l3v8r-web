@@ -26,7 +26,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { fetchYoutubeTranscript } from "../api/youtube-transcript";
+import { fetchYoutubeTranscript, clearTranscriptCacheForVideo } from "../api/youtube-transcript";
 import { generateLessonBreakdown, LessonBreakdown } from "../api/transcript-ai";
 import { useLessonBreakdownStore } from "../state/actionStepsStore";
 import { useAppStore } from "../state/appStore";
@@ -81,10 +81,27 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
 
         // Fetch transcript
         setLoading(true);
-        const transcriptResult = await fetchYoutubeTranscript(videoId);
+        let transcriptResult = await fetchYoutubeTranscript(videoId);
+
+        // Check if we got a valid transcript (at least 5 segments with meaningful content)
+        const isValidTranscript = transcriptResult &&
+          transcriptResult.segments &&
+          transcriptResult.segments.length >= 5 &&
+          transcriptResult.fullText.length > 200;
+
+        // If transcript seems invalid (too few segments), clear cache and retry once
+        if (!isValidTranscript && transcriptResult && transcriptResult.segments && transcriptResult.segments.length > 0) {
+          console.log("Transcript seems incomplete, clearing cache and retrying...");
+          await clearTranscriptCacheForVideo(videoId);
+          transcriptResult = await fetchYoutubeTranscript(videoId);
+        }
 
         if (!transcriptResult || !transcriptResult.segments || transcriptResult.segments.length === 0) {
           throw new Error("This video does not have captions available. Action steps can only be generated for videos with closed captions enabled.");
+        }
+
+        if (transcriptResult.segments.length < 5 || transcriptResult.fullText.length < 200) {
+          throw new Error("Could not fetch a complete transcript for this video. The caption service may be temporarily unavailable. Please try again later.");
         }
 
         // Generate lesson breakdown

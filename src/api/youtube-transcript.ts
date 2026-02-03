@@ -92,8 +92,13 @@ async function cacheTranscript(videoId: string, transcript: TranscriptResult): P
  * These services act as proxies and can bypass YouTube's restrictions
  */
 async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | null> {
-  // Try multiple public APIs
+  // Try multiple public APIs - ordered by reliability
   const apis = [
+    {
+      name: "tactiq.io",
+      url: `https://tactiq-apps-prod.tactiq.io/transcript?videoId=${videoId}&langCode=en`,
+      parser: parseTactiqResponse,
+    },
     {
       name: "youtubetranscript.com",
       url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
@@ -113,6 +118,8 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
         headers: {
           "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
           "Accept": "application/json, text/html, */*",
+          "Origin": "https://tactiq.io",
+          "Referer": "https://tactiq.io/",
         },
       });
 
@@ -124,16 +131,81 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
       const data = await response.text();
       console.log(`  ${api.name} response length: ${data.length}`);
 
+      // Skip if response is too short (likely an error message)
+      if (data.length < 500) {
+        console.log(`  ${api.name} response too short, likely an error. Content: ${data.slice(0, 200)}`);
+        continue;
+      }
+
       const result = api.parser(data, videoId);
-      if (result && result.segments.length > 0) {
+      // Require at least 5 segments to be considered valid (not just an error message parsed incorrectly)
+      if (result && result.segments.length >= 5) {
         console.log(`  ${api.name} success: ${result.segments.length} segments`);
         return result;
+      } else if (result) {
+        console.log(`  ${api.name} only found ${result.segments.length} segments, likely invalid`);
       }
     } catch (e: any) {
       console.log(`  ${api.name} error:`, e?.message || e);
     }
   }
 
+  return null;
+}
+
+/**
+ * Parse response from tactiq.io API
+ */
+function parseTactiqResponse(data: string, videoId: string): TranscriptResult | null {
+  try {
+    const json = JSON.parse(data);
+
+    // Check for error response
+    if (json.error || json.message) {
+      console.log("  Tactiq error:", json.error || json.message);
+      return null;
+    }
+
+    // Tactiq returns captions array
+    if (json.captions && Array.isArray(json.captions)) {
+      const segments: TranscriptSegment[] = json.captions.map((item: any) => ({
+        text: item.text || "",
+        start: (item.start || item.startMs || 0) / 1000,
+        duration: (item.duration || item.durationMs || 2000) / 1000,
+      })).filter((s: TranscriptSegment) => s.text.length > 0);
+
+      if (segments.length > 0) {
+        return {
+          segments,
+          fullText: segments.map(s => s.text).join(" "),
+          language: json.languageCode || "en",
+          videoId,
+          source: "api",
+        };
+      }
+    }
+
+    // Alternative format
+    if (json.transcript && typeof json.transcript === "string") {
+      // Single string transcript - split by sentences
+      const text = json.transcript;
+      const segments: TranscriptSegment[] = [{
+        text: text,
+        start: 0,
+        duration: 0,
+      }];
+
+      return {
+        segments,
+        fullText: text,
+        language: "en",
+        videoId,
+        source: "api",
+      };
+    }
+  } catch (e) {
+    console.log("  Error parsing tactiq response:", e);
+  }
   return null;
 }
 
@@ -743,6 +815,22 @@ export async function clearTranscriptCache(): Promise<number> {
   } catch (error) {
     console.error("Error clearing transcript cache:", error);
     return 0;
+  }
+}
+
+/**
+ * Clear cached transcript for a specific video
+ * Useful when a bad/incomplete transcript was cached
+ */
+export async function clearTranscriptCacheForVideo(videoId: string): Promise<boolean> {
+  try {
+    const cacheKey = `${CACHE_PREFIX}${videoId}`;
+    await AsyncStorage.removeItem(cacheKey);
+    console.log(`🗑️ Cleared cached transcript for ${videoId}`);
+    return true;
+  } catch (error) {
+    console.error("Error clearing transcript cache for video:", error);
+    return false;
   }
 }
 
