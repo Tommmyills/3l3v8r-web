@@ -187,31 +187,35 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
 
 /**
  * Fetch transcript via AllOrigins CORS proxy
+ * This fetches the caption track URL directly via proxy
  */
 async function fetchViaAllOriginsProxy(videoId: string): Promise<TranscriptResult | null> {
   try {
-    // Use allorigins.win as a CORS proxy to fetch YouTube page
-    const targetUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
-    const proxyUrl = `https://api.allorigins.win/raw?url=${targetUrl}`;
+    // First get the video page directly to find caption tracks (we know this works)
+    const videoPageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
 
-    const response = await fetch(proxyUrl);
-    if (!response.ok) {
-      console.log("    AllOrigins proxy returned", response.status);
+    if (!videoPageResponse.ok) {
+      console.log("    Failed to fetch video page:", videoPageResponse.status);
       return null;
     }
 
-    const html = await response.text();
-    console.log("    Proxy returned", html.length, "chars");
+    const html = await videoPageResponse.text();
 
     // Extract caption tracks from the page
     const captionTracksMatch = html.match(/"captionTracks":\s*(\[[^\]]*\])/);
     if (!captionTracksMatch) {
-      console.log("    No captionTracks in proxied page");
+      console.log("    No captionTracks found");
       return null;
     }
 
     const captionTracks = JSON.parse(captionTracksMatch[1]);
     if (!captionTracks || captionTracks.length === 0) {
+      console.log("    Empty caption tracks");
       return null;
     }
 
@@ -221,10 +225,13 @@ async function fetchViaAllOriginsProxy(videoId: string): Promise<TranscriptResul
     ) || captionTracks[0];
 
     if (!track?.baseUrl) {
+      console.log("    No baseUrl in track");
       return null;
     }
 
-    // Fetch the caption track via proxy
+    console.log("    Found caption URL, fetching via proxy...");
+
+    // Now fetch the caption track via AllOrigins proxy
     const captionProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(track.baseUrl)}`;
     const captionResponse = await fetch(captionProxyUrl);
 
@@ -234,15 +241,20 @@ async function fetchViaAllOriginsProxy(videoId: string): Promise<TranscriptResul
     }
 
     const captionText = await captionResponse.text();
-    console.log("    Caption text length:", captionText.length);
+    console.log("    Caption text via proxy length:", captionText.length);
 
     if (captionText.length === 0) {
+      console.log("    Empty caption response from proxy");
       return null;
     }
+
+    // Log preview
+    console.log("    Caption preview:", captionText.slice(0, 150).replace(/\n/g, " "));
 
     // Parse XML captions
     const segments = parseXMLCaptions(captionText);
     if (segments.length > 0) {
+      console.log("    Parsed", segments.length, "segments via proxy");
       return {
         segments,
         fullText: segments.map(s => s.text).join(" "),
@@ -255,6 +267,7 @@ async function fetchViaAllOriginsProxy(videoId: string): Promise<TranscriptResul
     // Try alternative parsing
     const altSegments = parseXMLCaptionsAlt(captionText);
     if (altSegments.length > 0) {
+      console.log("    Parsed", altSegments.length, "segments via alt parser");
       return {
         segments: altSegments,
         fullText: altSegments.map(s => s.text).join(" "),
@@ -263,6 +276,8 @@ async function fetchViaAllOriginsProxy(videoId: string): Promise<TranscriptResul
         source: "api",
       };
     }
+
+    console.log("    Could not parse caption text");
   } catch (e: any) {
     console.log("    AllOrigins error:", e?.message || e);
   }
