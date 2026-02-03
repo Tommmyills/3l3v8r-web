@@ -84,7 +84,7 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
         const transcriptResult = await fetchYoutubeTranscript(videoId);
 
         if (!transcriptResult || !transcriptResult.segments || transcriptResult.segments.length === 0) {
-          throw new Error("No transcript available for this video");
+          throw new Error("This video does not have captions available. Action steps can only be generated for videos with closed captions enabled.");
         }
 
         // Generate lesson breakdown
@@ -313,20 +313,36 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
           )}
 
           {error && (
-            <View className="items-center justify-center py-20 px-6">
-              <Ionicons name="alert-circle-outline" size={48} color="#F87171" style={{ marginBottom: 16 }} />
-              <Text
-                className="text-gray-300 text-base text-center mb-2"
-                style={{ letterSpacing: 0.5, fontFamily: "monospace" }}
+            <View className="items-center justify-center py-16 px-6">
+              <View
+                className="w-20 h-20 rounded-full items-center justify-center mb-6"
+                style={{ backgroundColor: "rgba(248,113,113,0.1)" }}
               >
-                Could not generate action steps
+                <Ionicons name="videocam-off-outline" size={36} color="#F87171" />
+              </View>
+              <Text
+                className="text-gray-200 text-lg text-center mb-3 font-semibold"
+                style={{ letterSpacing: 0.5 }}
+              >
+                No Captions Available
               </Text>
               <Text
-                className="text-gray-500 text-sm text-center"
-                style={{ letterSpacing: 0.3 }}
+                className="text-gray-400 text-sm text-center mb-6"
+                style={{ letterSpacing: 0.3, lineHeight: 20 }}
               >
                 {error}
               </Text>
+              <View
+                className="px-5 py-4 rounded-xl"
+                style={{ backgroundColor: "rgba(255,255,255,0.03)" }}
+              >
+                <Text
+                  className="text-gray-500 text-xs text-center"
+                  style={{ letterSpacing: 0.3, lineHeight: 18 }}
+                >
+                  Try a different video that has closed captions (CC) enabled on YouTube.
+                </Text>
+              </View>
             </View>
           )}
 
