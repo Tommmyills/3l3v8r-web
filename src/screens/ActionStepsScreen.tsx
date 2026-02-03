@@ -144,9 +144,17 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
           transcriptResult.segments.length >= 5 &&
           transcriptResult.fullText.length > 200;
 
+        console.log("Transcript validation:", {
+          hasSegments: !!transcriptResult?.segments,
+          segmentCount: transcriptResult?.segments?.length || 0,
+          textLength: transcriptResult?.fullText?.length || 0,
+          isValid: isValidAfterRetry,
+          webViewAttempted,
+        });
+
         // If still no valid transcript, try WebView fallback
         if (!isValidAfterRetry && !webViewAttempted) {
-          console.log("Standard methods failed, trying WebView fallback...");
+          console.log("🌐 Standard methods failed, trying WebView fallback...");
           setLoadingStatus("Trying alternative method...");
           setWebViewAttempted(true);
           setUseWebViewFallback(true);
