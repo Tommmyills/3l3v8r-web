@@ -2,9 +2,10 @@
  * YouTube Transcript Fetcher
  * Uses multiple fallback methods for bulletproof transcript extraction
  * Method 0: Cache (instant)
- * Method 1: Direct Innertube API (most reliable in 2025)
- * Method 2: youtube-caption-extractor (legacy fallback)
- * Method 3: youtube-transcript package (legacy fallback)
+ * Method 1: YouTube Transcript API proxy (most reliable in 2025)
+ * Method 2: Direct Innertube API
+ * Method 3: youtube-caption-extractor (legacy fallback)
+ * Method 4: youtube-transcript package (legacy fallback)
  * Caches transcripts locally for instant loading on repeat visits
  */
 
@@ -17,7 +18,7 @@ let YoutubeTranscript: typeof import("youtube-transcript").YoutubeTranscript | n
 // Cache configuration
 const CACHE_PREFIX = "transcript_";
 const CACHE_EXPIRY_DAYS = 7;
-const FETCH_TIMEOUT = 15000; // 15 seconds max per method
+const FETCH_TIMEOUT = 20000; // 20 seconds max per method
 
 export interface TranscriptSegment {
   text: string;
@@ -30,7 +31,7 @@ export interface TranscriptResult {
   fullText: string;
   language: string;
   videoId: string;
-  source?: "captions" | "whisper" | "innertube"; // Track how we got the transcript
+  source?: "captions" | "whisper" | "innertube" | "api"; // Track how we got the transcript
   cachedAt?: number; // Timestamp when cached
 }
 
@@ -87,7 +88,170 @@ async function cacheTranscript(videoId: string, transcript: TranscriptResult): P
 }
 
 /**
- * METHOD 1: Direct Innertube API (most reliable as of 2025)
+ * METHOD 1: Use public transcript API services
+ * These services act as proxies and can bypass YouTube's restrictions
+ */
+async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | null> {
+  // Try multiple public APIs
+  const apis = [
+    {
+      name: "youtubetranscript.com",
+      url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
+      parser: parseYoutubeTranscriptCom,
+    },
+    {
+      name: "kome.ai",
+      url: `https://kome.ai/api/transcript?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      parser: parseKomeAI,
+    },
+  ];
+
+  for (const api of apis) {
+    try {
+      console.log(`  Trying ${api.name}...`);
+      const response = await fetch(api.url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+          "Accept": "application/json, text/html, */*",
+        },
+      });
+
+      if (!response.ok) {
+        console.log(`  ${api.name} returned ${response.status}`);
+        continue;
+      }
+
+      const data = await response.text();
+      console.log(`  ${api.name} response length: ${data.length}`);
+
+      const result = api.parser(data, videoId);
+      if (result && result.segments.length > 0) {
+        console.log(`  ${api.name} success: ${result.segments.length} segments`);
+        return result;
+      }
+    } catch (e: any) {
+      console.log(`  ${api.name} error:`, e?.message || e);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse response from youtubetranscript.com
+ */
+function parseYoutubeTranscriptCom(html: string, videoId: string): TranscriptResult | null {
+  try {
+    // The response is HTML with transcript data
+    // Look for transcript text in various formats
+    const segments: TranscriptSegment[] = [];
+
+    // Try to find XML-style transcript data
+    const xmlMatch = html.match(/<transcript[^>]*>([\s\S]*?)<\/transcript>/i);
+    if (xmlMatch) {
+      const xmlSegments = parseXMLCaptions(xmlMatch[1]);
+      if (xmlSegments.length > 0) {
+        return {
+          segments: xmlSegments,
+          fullText: xmlSegments.map(s => s.text).join(" "),
+          language: "en",
+          videoId,
+          source: "api",
+        };
+      }
+    }
+
+    // Try to find JSON data
+    const jsonMatch = html.match(/\[[\s\S]*?"text"[\s\S]*?\]/);
+    if (jsonMatch) {
+      try {
+        const items = JSON.parse(jsonMatch[0]);
+        for (const item of items) {
+          if (item.text) {
+            segments.push({
+              text: item.text,
+              start: item.start || item.offset || 0,
+              duration: item.duration || item.dur || 2,
+            });
+          }
+        }
+      } catch (e) {
+        // Not valid JSON
+      }
+    }
+
+    // Try parsing text content directly
+    const textMatches = html.matchAll(/<text[^>]*start="([^"]+)"[^>]*dur="([^"]+)"[^>]*>([\s\S]*?)<\/text>/gi);
+    for (const match of textMatches) {
+      segments.push({
+        start: parseFloat(match[1]),
+        duration: parseFloat(match[2]),
+        text: decodeHTMLEntities(match[3]),
+      });
+    }
+
+    if (segments.length > 0) {
+      return {
+        segments,
+        fullText: segments.map(s => s.text).join(" "),
+        language: "en",
+        videoId,
+        source: "api",
+      };
+    }
+  } catch (e) {
+    console.log("  Error parsing youtubetranscript.com:", e);
+  }
+  return null;
+}
+
+/**
+ * Parse response from kome.ai
+ */
+function parseKomeAI(data: string, videoId: string): TranscriptResult | null {
+  try {
+    const json = JSON.parse(data);
+    if (json.transcript && Array.isArray(json.transcript)) {
+      const segments: TranscriptSegment[] = json.transcript.map((item: any) => ({
+        text: item.text || item.content || "",
+        start: item.start || item.offset || 0,
+        duration: item.duration || 2,
+      })).filter((s: TranscriptSegment) => s.text.length > 0);
+
+      if (segments.length > 0) {
+        return {
+          segments,
+          fullText: segments.map(s => s.text).join(" "),
+          language: json.language || "en",
+          videoId,
+          source: "api",
+        };
+      }
+    }
+  } catch (e) {
+    console.log("  Error parsing kome.ai:", e);
+  }
+  return null;
+}
+
+/**
+ * Decode HTML entities in text
+ */
+function decodeHTMLEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/\n/g, " ")
+    .trim();
+}
+
+/**
+ * METHOD 2: Direct Innertube API (most reliable as of 2025)
  * This uses YouTube's internal API that powers the web player
  */
 async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null> {
@@ -283,15 +447,7 @@ function parseXMLCaptions(xml: string): TranscriptSegment[] {
     const start = parseFloat(match[1]);
     const duration = parseFloat(match[2]);
     // Decode HTML entities
-    const text = match[3]
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, "\"")
-      .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, " ")
-      .replace(/\n/g, " ")
-      .trim();
+    const text = decodeHTMLEntities(match[3]);
 
     if (text.length > 0) {
       segments.push({ text, start, duration });
@@ -319,16 +475,7 @@ function parseXMLCaptionsAlt(xml: string): TranscriptSegment[] {
     while ((match = pattern.exec(xml)) !== null) {
       const start = parseFloat(match[1]) / (match[1].includes(".") ? 1 : 1000); // Handle ms vs seconds
       const duration = match[2] ? parseFloat(match[2]) / (match[2].includes(".") ? 1 : 1000) : 2;
-      const text = (match[3] || match[2])
-        .replace(/<[^>]+>/g, "") // Remove any inner tags
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, "\"")
-        .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, " ")
-        .replace(/\n/g, " ")
-        .trim();
+      const text = decodeHTMLEntities((match[3] || match[2]).replace(/<[^>]+>/g, "")); // Remove any inner tags
 
       if (text.length > 0) {
         segments.push({ text, start, duration });
@@ -360,11 +507,11 @@ export async function fetchYoutubeTranscript(
       return cached;
     }
 
-    // METHOD 1: Try Innertube API (most reliable in 2025)
+    // METHOD 1: Try transcript API services (most reliable - bypasses YouTube blocks)
     try {
-      console.log("⏳ METHOD 1: Trying Innertube API...");
+      console.log("⏳ METHOD 1: Trying transcript API services...");
       const result = await Promise.race([
-        tryInnertubeAPI(videoId),
+        tryTranscriptAPI(videoId),
         timeout(FETCH_TIMEOUT, "Method 1 timeout")
       ]);
 
@@ -379,11 +526,11 @@ export async function fetchYoutubeTranscript(
       console.log("❌ METHOD 1 failed:", error?.message || "Unknown error");
     }
 
-    // METHOD 2: Try youtube-caption-extractor (legacy fallback)
+    // METHOD 2: Try Innertube API
     try {
-      console.log("⏳ METHOD 2: Trying youtube-caption-extractor...");
+      console.log("⏳ METHOD 2: Trying Innertube API...");
       const result = await Promise.race([
-        tryYoutubeCaptionExtractor(videoId, languageCode),
+        tryInnertubeAPI(videoId),
         timeout(FETCH_TIMEOUT, "Method 2 timeout")
       ]);
 
@@ -398,11 +545,11 @@ export async function fetchYoutubeTranscript(
       console.log("❌ METHOD 2 failed:", error?.message || "Unknown error");
     }
 
-    // METHOD 3: Try youtube-transcript package (legacy fallback)
+    // METHOD 3: Try youtube-caption-extractor (legacy fallback)
     try {
-      console.log("⏳ METHOD 3: Trying youtube-transcript package...");
+      console.log("⏳ METHOD 3: Trying youtube-caption-extractor...");
       const result = await Promise.race([
-        tryYoutubeTranscriptPackage(videoId),
+        tryYoutubeCaptionExtractor(videoId, languageCode),
         timeout(FETCH_TIMEOUT, "Method 3 timeout")
       ]);
 
@@ -415,6 +562,25 @@ export async function fetchYoutubeTranscript(
       }
     } catch (error: any) {
       console.log("❌ METHOD 3 failed:", error?.message || "Unknown error");
+    }
+
+    // METHOD 4: Try youtube-transcript package (legacy fallback)
+    try {
+      console.log("⏳ METHOD 4: Trying youtube-transcript package...");
+      const result = await Promise.race([
+        tryYoutubeTranscriptPackage(videoId),
+        timeout(FETCH_TIMEOUT, "Method 4 timeout")
+      ]);
+
+      if (result) {
+        console.log("✅ METHOD 4: Success -", result.segments.length, "segments");
+        await cacheTranscript(videoId, result);
+        return result;
+      } else {
+        console.log("❌ METHOD 4 returned null/empty");
+      }
+    } catch (error: any) {
+      console.log("❌ METHOD 4 failed:", error?.message || "Unknown error");
     }
 
     // All methods failed - this is an expected case for videos without captions
@@ -450,7 +616,7 @@ function timeout(ms: number, message: string): Promise<never> {
 }
 
 /**
- * METHOD 2: youtube-caption-extractor (legacy)
+ * METHOD 3: youtube-caption-extractor (legacy)
  */
 async function tryYoutubeCaptionExtractor(
   videoId: string,
@@ -498,7 +664,7 @@ async function tryYoutubeCaptionExtractor(
 }
 
 /**
- * METHOD 3: youtube-transcript package (legacy)
+ * METHOD 4: youtube-transcript package (legacy)
  */
 async function tryYoutubeTranscriptPackage(
   videoId: string
