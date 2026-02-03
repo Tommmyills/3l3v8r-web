@@ -49,31 +49,67 @@ const INJECTED_JAVASCRIPT = `
         const track = captionTracks.find(t => t.languageCode === 'en' || t.languageCode?.startsWith('en')) || captionTracks[0];
 
         if (track && track.baseUrl) {
-          // Fetch the caption track
-          fetch(track.baseUrl)
+          // Try fetching with json3 format first (more reliable)
+          const jsonUrl = track.baseUrl + '&fmt=json3';
+
+          fetch(jsonUrl)
             .then(response => response.text())
-            .then(xml => {
-              // Parse XML captions
-              const segments = [];
-              const regex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>([^<]*)<\\/text>/g;
-              let match;
+            .then(data => {
+              let segments = [];
 
-              while ((match = regex.exec(xml)) !== null) {
-                const text = match[3]
-                  .replace(/&amp;/g, '&')
-                  .replace(/&lt;/g, '<')
-                  .replace(/&gt;/g, '>')
-                  .replace(/&quot;/g, '"')
-                  .replace(/&#39;/g, "'")
-                  .replace(/&nbsp;/g, ' ')
-                  .trim();
+              // Try JSON format first
+              try {
+                const json = JSON.parse(data);
+                if (json.events) {
+                  segments = json.events
+                    .filter(e => e.segs && e.segs.length > 0)
+                    .map(e => ({
+                      text: e.segs.map(s => s.utf8 || '').join('').trim(),
+                      start: (e.tStartMs || 0) / 1000,
+                      duration: (e.dDurationMs || 0) / 1000
+                    }))
+                    .filter(s => s.text.length > 0);
+                }
+              } catch (jsonErr) {
+                // Not JSON, try XML parsing
+              }
 
-                if (text.length > 0) {
-                  segments.push({
-                    text: text,
-                    start: parseFloat(match[1]),
-                    duration: parseFloat(match[2])
-                  });
+              // If JSON didn't work, try XML parsing
+              if (segments.length === 0) {
+                // Try multiple XML patterns
+                const patterns = [
+                  /<text start="([^"]+)" dur="([^"]+)"[^>]*>([\\s\\S]*?)<\\/text>/g,
+                  /<text start='([^']+)' dur='([^']+)'[^>]*>([\\s\\S]*?)<\\/text>/g,
+                  /<p t="([^"]+)" d="([^"]+)"[^>]*>([\\s\\S]*?)<\\/p>/g
+                ];
+
+                for (const pattern of patterns) {
+                  let match;
+                  const tempSegments = [];
+                  while ((match = pattern.exec(data)) !== null) {
+                    const text = match[3]
+                      .replace(/<[^>]+>/g, '') // Remove any nested tags
+                      .replace(/&amp;/g, '&')
+                      .replace(/&lt;/g, '<')
+                      .replace(/&gt;/g, '>')
+                      .replace(/&quot;/g, '"')
+                      .replace(/&#39;/g, "'")
+                      .replace(/&nbsp;/g, ' ')
+                      .replace(/&#(\\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+                      .trim();
+
+                    if (text.length > 0) {
+                      tempSegments.push({
+                        text: text,
+                        start: parseFloat(match[1]),
+                        duration: parseFloat(match[2])
+                      });
+                    }
+                  }
+                  if (tempSegments.length > 0) {
+                    segments = tempSegments;
+                    break;
+                  }
                 }
               }
 
@@ -88,9 +124,10 @@ const INJECTED_JAVASCRIPT = `
                   }
                 }));
               } else {
+                // Log first 500 chars for debugging
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'error',
-                  message: 'Could not parse caption XML'
+                  message: 'Could not parse caption data. Length: ' + data.length + ', Preview: ' + data.substring(0, 200)
                 }));
               }
             })
