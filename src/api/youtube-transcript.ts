@@ -182,13 +182,15 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
  */
 async function fetchCaptionTrack(baseUrl: string, videoId: string, language: string): Promise<TranscriptResult | null> {
   try {
-    // Add format parameter for better parsing
-    const url = baseUrl.includes("fmt=") ? baseUrl : `${baseUrl}&fmt=json3`;
+    // Try XML format first (more reliable), then JSON
+    // Remove any existing fmt parameter and request XML
+    let url = baseUrl;
 
-    console.log("  Fetching caption track...");
+    console.log("  Fetching caption track (XML format)...");
     const response = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/xml, application/xml, */*",
       },
     });
 
@@ -198,11 +200,28 @@ async function fetchCaptionTrack(baseUrl: string, videoId: string, language: str
     }
 
     const text = await response.text();
+    console.log("  Response length:", text.length, "chars, starts with:", text.slice(0, 100));
 
-    // Try JSON format first
-    if (text.startsWith("{")) {
+    // Try XML format first (YouTube's default)
+    if (text.includes("<transcript>") || text.includes("<text ") || text.includes("<?xml")) {
+      const xmlSegments = parseXMLCaptions(text);
+      if (xmlSegments.length > 0) {
+        console.log("  Parsed", xmlSegments.length, "segments from XML");
+        return {
+          segments: xmlSegments,
+          fullText: xmlSegments.map(s => s.text).join(" "),
+          language,
+          videoId,
+          source: "innertube",
+        };
+      }
+    }
+
+    // Try JSON format
+    if (text.startsWith("{") || text.includes('"events"')) {
       try {
         const json = JSON.parse(text);
+        console.log("  JSON keys:", Object.keys(json).join(", "));
         if (json.events) {
           const segments: TranscriptSegment[] = json.events
             .filter((e: any) => e.segs && e.segs.length > 0)
@@ -225,24 +244,24 @@ async function fetchCaptionTrack(baseUrl: string, videoId: string, language: str
           }
         }
       } catch (e) {
-        console.log("  JSON parse failed, trying XML...");
+        console.log("  JSON parse failed:", e);
       }
     }
 
-    // Try XML format
-    const xmlSegments = parseXMLCaptions(text);
-    if (xmlSegments.length > 0) {
-      console.log("  Parsed", xmlSegments.length, "segments from XML");
+    // Try alternative XML parsing for different formats
+    const altSegments = parseXMLCaptionsAlt(text);
+    if (altSegments.length > 0) {
+      console.log("  Parsed", altSegments.length, "segments from alt XML");
       return {
-        segments: xmlSegments,
-        fullText: xmlSegments.map(s => s.text).join(" "),
+        segments: altSegments,
+        fullText: altSegments.map((s: TranscriptSegment) => s.text).join(" "),
         language,
         videoId,
         source: "innertube",
       };
     }
 
-    console.log("  Could not parse caption track response");
+    console.log("  Could not parse caption track response. Sample:", text.slice(0, 300));
     return null;
   } catch (error: any) {
     console.log("  Error fetching caption track:", error?.message || error);
@@ -277,6 +296,46 @@ function parseXMLCaptions(xml: string): TranscriptSegment[] {
     if (text.length > 0) {
       segments.push({ text, start, duration });
     }
+  }
+
+  return segments;
+}
+
+/**
+ * Alternative XML parsing for different caption formats
+ */
+function parseXMLCaptionsAlt(xml: string): TranscriptSegment[] {
+  const segments: TranscriptSegment[] = [];
+
+  // Try matching with single quotes or different attribute order
+  const patterns = [
+    /<text[^>]*start=['"]([^'"]+)['"][^>]*dur=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/text>/gi,
+    /<p[^>]*t=['"]([^'"]+)['"][^>]*d=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/p>/gi,
+    /<s[^>]*t=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/s>/gi,
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(xml)) !== null) {
+      const start = parseFloat(match[1]) / (match[1].includes(".") ? 1 : 1000); // Handle ms vs seconds
+      const duration = match[2] ? parseFloat(match[2]) / (match[2].includes(".") ? 1 : 1000) : 2;
+      const text = (match[3] || match[2])
+        .replace(/<[^>]+>/g, "") // Remove any inner tags
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, "\"")
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\n/g, " ")
+        .trim();
+
+      if (text.length > 0) {
+        segments.push({ text, start, duration });
+      }
+    }
+
+    if (segments.length > 0) break;
   }
 
   return segments;
