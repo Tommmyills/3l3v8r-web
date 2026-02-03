@@ -19,28 +19,32 @@ interface TranscriptWebViewProps {
 const INJECTED_JAVASCRIPT = `
 (function() {
   try {
-    // Wait for YouTube to load
     const checkForCaptions = () => {
-      // Look for captionTracks in ytInitialPlayerResponse
-      const scripts = document.querySelectorAll('script');
       let captionTracks = null;
+      let transcriptData = null;
 
-      for (const script of scripts) {
-        const content = script.textContent || '';
-        const match = content.match(/"captionTracks":\\s*(\\[[^\\]]*\\])/);
-        if (match) {
-          try {
-            captionTracks = JSON.parse(match[1]);
-            break;
-          } catch (e) {}
-        }
-      }
-
-      // Also try window.ytInitialPlayerResponse
-      if (!captionTracks && window.ytInitialPlayerResponse) {
+      // Method 1: Try to get transcript from ytInitialPlayerResponse (embedded in page)
+      if (window.ytInitialPlayerResponse) {
         const captions = window.ytInitialPlayerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
         if (captions) {
           captionTracks = captions;
+        }
+      }
+
+      // Method 2: Search in script tags
+      if (!captionTracks) {
+        const scripts = document.querySelectorAll('script');
+        for (const script of scripts) {
+          const content = script.textContent || '';
+
+          // Try to find captionTracks
+          const match = content.match(/"captionTracks":\\s*(\\[[^\\]]*\\])/);
+          if (match) {
+            try {
+              captionTracks = JSON.parse(match[1]);
+              break;
+            } catch (e) {}
+          }
         }
       }
 
@@ -49,105 +53,116 @@ const INJECTED_JAVASCRIPT = `
         const track = captionTracks.find(t => t.languageCode === 'en' || t.languageCode?.startsWith('en')) || captionTracks[0];
 
         if (track && track.baseUrl) {
-          // Try fetching with json3 format first (more reliable)
-          const jsonUrl = track.baseUrl + '&fmt=json3';
+          // Try multiple fetch approaches
+          const tryFetch = async () => {
+            const urls = [
+              track.baseUrl + '&fmt=json3',
+              track.baseUrl,
+              track.baseUrl.replace('&fmt=srv3', '') + '&fmt=json3',
+            ];
 
-          fetch(jsonUrl)
-            .then(response => response.text())
-            .then(data => {
-              let segments = [];
-
-              // Try JSON format first
+            for (const url of urls) {
               try {
-                const json = JSON.parse(data);
-                if (json.events) {
-                  segments = json.events
-                    .filter(e => e.segs && e.segs.length > 0)
-                    .map(e => ({
-                      text: e.segs.map(s => s.utf8 || '').join('').trim(),
-                      start: (e.tStartMs || 0) / 1000,
-                      duration: (e.dDurationMs || 0) / 1000
-                    }))
-                    .filter(s => s.text.length > 0);
-                }
-              } catch (jsonErr) {
-                // Not JSON, try XML parsing
-              }
+                const response = await fetch(url, {
+                  credentials: 'include',
+                  headers: {
+                    'Accept': '*/*',
+                  }
+                });
 
-              // If JSON didn't work, try XML parsing
-              if (segments.length === 0) {
-                // Try multiple XML patterns
-                const patterns = [
-                  /<text start="([^"]+)" dur="([^"]+)"[^>]*>([\\s\\S]*?)<\\/text>/g,
-                  /<text start='([^']+)' dur='([^']+)'[^>]*>([\\s\\S]*?)<\\/text>/g,
-                  /<p t="([^"]+)" d="([^"]+)"[^>]*>([\\s\\S]*?)<\\/p>/g
-                ];
+                if (response.ok) {
+                  const data = await response.text();
 
-                for (const pattern of patterns) {
-                  let match;
-                  const tempSegments = [];
-                  while ((match = pattern.exec(data)) !== null) {
-                    const text = match[3]
-                      .replace(/<[^>]+>/g, '') // Remove any nested tags
-                      .replace(/&amp;/g, '&')
-                      .replace(/&lt;/g, '<')
-                      .replace(/&gt;/g, '>')
-                      .replace(/&quot;/g, '"')
-                      .replace(/&#39;/g, "'")
-                      .replace(/&nbsp;/g, ' ')
-                      .replace(/&#(\\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-                      .trim();
+                  if (data.length > 100) {
+                    // Try to parse
+                    let segments = [];
 
-                    if (text.length > 0) {
-                      tempSegments.push({
-                        text: text,
-                        start: parseFloat(match[1]),
-                        duration: parseFloat(match[2])
-                      });
+                    // Try JSON
+                    try {
+                      const json = JSON.parse(data);
+                      if (json.events) {
+                        segments = json.events
+                          .filter(e => e.segs && e.segs.length > 0)
+                          .map(e => ({
+                            text: e.segs.map(s => s.utf8 || '').join('').trim(),
+                            start: (e.tStartMs || 0) / 1000,
+                            duration: (e.dDurationMs || 0) / 1000
+                          }))
+                          .filter(s => s.text.length > 0);
+                      }
+                    } catch (e) {}
+
+                    // Try XML if JSON didn't work
+                    if (segments.length === 0) {
+                      const patterns = [
+                        /<text start="([^"]+)" dur="([^"]+)"[^>]*>([\\s\\S]*?)<\\/text>/g,
+                        /<text start='([^']+)' dur='([^']+)'[^>]*>([\\s\\S]*?)<\\/text>/g,
+                      ];
+
+                      for (const pattern of patterns) {
+                        let match;
+                        while ((match = pattern.exec(data)) !== null) {
+                          const text = match[3]
+                            .replace(/<[^>]+>/g, '')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&lt;/g, '<')
+                            .replace(/&gt;/g, '>')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#39;/g, "'")
+                            .replace(/&nbsp;/g, ' ')
+                            .replace(/&#(\\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+                            .trim();
+
+                          if (text.length > 0) {
+                            segments.push({
+                              text: text,
+                              start: parseFloat(match[1]),
+                              duration: parseFloat(match[2])
+                            });
+                          }
+                        }
+                        if (segments.length > 0) break;
+                      }
+                    }
+
+                    if (segments.length > 0) {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'transcript',
+                        data: {
+                          segments: segments,
+                          fullText: segments.map(s => s.text).join(' '),
+                          language: track.languageCode || 'en',
+                          source: 'webview'
+                        }
+                      }));
+                      return;
                     }
                   }
-                  if (tempSegments.length > 0) {
-                    segments = tempSegments;
-                    break;
-                  }
                 }
+              } catch (e) {
+                // Try next URL
               }
+            }
 
-              if (segments.length > 0) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'transcript',
-                  data: {
-                    segments: segments,
-                    fullText: segments.map(s => s.text).join(' '),
-                    language: track.languageCode || 'en',
-                    source: 'webview'
-                  }
-                }));
-              } else {
-                // Log first 500 chars for debugging
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'error',
-                  message: 'Could not parse caption data. Length: ' + data.length + ', Preview: ' + data.substring(0, 200)
-                }));
-              }
-            })
-            .catch(err => {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'error',
-                message: 'Failed to fetch captions: ' + err.message
-              }));
-            });
+            // All URLs failed
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'error',
+              message: 'Could not fetch captions from any URL'
+            }));
+          };
+
+          tryFetch();
         } else {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'error',
-            message: 'No caption URL found'
+            message: 'No caption URL found in track'
           }));
         }
       } else {
         // Retry after a short delay
-        if (window._captionRetries < 5) {
+        if (window._captionRetries < 10) {
           window._captionRetries = (window._captionRetries || 0) + 1;
-          setTimeout(checkForCaptions, 1000);
+          setTimeout(checkForCaptions, 500);
         } else {
           window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'error',
@@ -159,15 +174,12 @@ const INJECTED_JAVASCRIPT = `
 
     window._captionRetries = 0;
 
-    // Start checking after page load
+    // Wait for page to be ready
     if (document.readyState === 'complete') {
-      checkForCaptions();
+      setTimeout(checkForCaptions, 1000);
     } else {
-      window.addEventListener('load', checkForCaptions);
+      window.addEventListener('load', () => setTimeout(checkForCaptions, 1000));
     }
-
-    // Also try immediately
-    setTimeout(checkForCaptions, 500);
 
   } catch (e) {
     window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -217,7 +229,7 @@ export const TranscriptWebView: React.FC<TranscriptWebViewProps> = ({
   }, [videoId, onTranscriptFetched, onError, hasResult]);
 
   return (
-    <View style={{ width: 0, height: 0, opacity: 0, position: "absolute" }}>
+    <View style={{ width: 1, height: 1, opacity: 0, position: "absolute" }}>
       <WebView
         ref={webViewRef}
         source={{ uri: `https://www.youtube.com/watch?v=${videoId}` }}
@@ -227,7 +239,11 @@ export const TranscriptWebView: React.FC<TranscriptWebViewProps> = ({
         domStorageEnabled={true}
         sharedCookiesEnabled={true}
         thirdPartyCookiesEnabled={true}
-        userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        incognito={false}
+        cacheEnabled={true}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={true}
+        userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         onError={(e) => {
           console.log("WebView error:", e.nativeEvent.description);
           onError("WebView failed to load");
