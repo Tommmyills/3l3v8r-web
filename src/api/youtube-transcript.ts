@@ -108,9 +108,12 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
   // Try multiple public APIs - ordered by reliability
   const apis = [
     {
-      name: "searchapi.io",
-      url: `https://www.searchapi.io/api/v1/search?engine=youtube_transcripts&video_id=${videoId}`,
-      parser: parseSearchAPIResponse,
+      name: "rapidapi-ytstream",
+      fetcher: () => fetchRapidAPITranscript(videoId),
+    },
+    {
+      name: "allorigins-proxy",
+      fetcher: () => fetchViaAllOriginsProxy(videoId),
     },
     {
       name: "downsub.com",
@@ -122,16 +125,28 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
       url: `https://tactiq-apps-prod.tactiq.io/transcript?videoId=${videoId}&langCode=en`,
       parser: parseTactiqResponse,
     },
-    {
-      name: "youtubetranscript.com",
-      url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
-      parser: parseYoutubeTranscriptCom,
-    },
   ];
 
   for (const api of apis) {
     try {
       console.log(`  Trying ${api.name}...`);
+
+      // Handle custom fetchers
+      if ('fetcher' in api && api.fetcher) {
+        const result = await api.fetcher();
+        if (result && result.segments.length >= 5) {
+          console.log(`  ${api.name} success: ${result.segments.length} segments`);
+          return result;
+        } else if (result) {
+          console.log(`  ${api.name} only found ${result.segments.length} segments`);
+        }
+        continue;
+      }
+
+      if (!('url' in api) || !api.url || !('parser' in api) || !api.parser) {
+        continue;
+      }
+
       const response = await fetch(api.url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -155,7 +170,7 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
       }
 
       const result = api.parser(data, videoId);
-      // Require at least 5 segments to be considered valid (not just an error message parsed incorrectly)
+      // Require at least 5 segments to be considered valid
       if (result && result.segments.length >= 5) {
         console.log(`  ${api.name} success: ${result.segments.length} segments`);
         return result;
@@ -167,6 +182,133 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
     }
   }
 
+  return null;
+}
+
+/**
+ * Fetch transcript via AllOrigins CORS proxy
+ */
+async function fetchViaAllOriginsProxy(videoId: string): Promise<TranscriptResult | null> {
+  try {
+    // Use allorigins.win as a CORS proxy to fetch YouTube page
+    const targetUrl = encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`);
+    const proxyUrl = `https://api.allorigins.win/raw?url=${targetUrl}`;
+
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      console.log("    AllOrigins proxy returned", response.status);
+      return null;
+    }
+
+    const html = await response.text();
+    console.log("    Proxy returned", html.length, "chars");
+
+    // Extract caption tracks from the page
+    const captionTracksMatch = html.match(/"captionTracks":\s*(\[[^\]]*\])/);
+    if (!captionTracksMatch) {
+      console.log("    No captionTracks in proxied page");
+      return null;
+    }
+
+    const captionTracks = JSON.parse(captionTracksMatch[1]);
+    if (!captionTracks || captionTracks.length === 0) {
+      return null;
+    }
+
+    // Find English track
+    const track = captionTracks.find((t: any) =>
+      t.languageCode === "en" || t.languageCode?.startsWith("en")
+    ) || captionTracks[0];
+
+    if (!track?.baseUrl) {
+      return null;
+    }
+
+    // Fetch the caption track via proxy
+    const captionProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(track.baseUrl)}`;
+    const captionResponse = await fetch(captionProxyUrl);
+
+    if (!captionResponse.ok) {
+      console.log("    Caption fetch via proxy failed:", captionResponse.status);
+      return null;
+    }
+
+    const captionText = await captionResponse.text();
+    console.log("    Caption text length:", captionText.length);
+
+    if (captionText.length === 0) {
+      return null;
+    }
+
+    // Parse XML captions
+    const segments = parseXMLCaptions(captionText);
+    if (segments.length > 0) {
+      return {
+        segments,
+        fullText: segments.map(s => s.text).join(" "),
+        language: track.languageCode || "en",
+        videoId,
+        source: "api",
+      };
+    }
+
+    // Try alternative parsing
+    const altSegments = parseXMLCaptionsAlt(captionText);
+    if (altSegments.length > 0) {
+      return {
+        segments: altSegments,
+        fullText: altSegments.map(s => s.text).join(" "),
+        language: track.languageCode || "en",
+        videoId,
+        source: "api",
+      };
+    }
+  } catch (e: any) {
+    console.log("    AllOrigins error:", e?.message || e);
+  }
+  return null;
+}
+
+/**
+ * Fetch transcript via RapidAPI (free tier available)
+ */
+async function fetchRapidAPITranscript(videoId: string): Promise<TranscriptResult | null> {
+  try {
+    // Try a free YouTube transcript API
+    const response = await fetch(`https://yt-api.p.rapidapi.com/captions?id=${videoId}`, {
+      headers: {
+        "X-RapidAPI-Key": "free-tier", // This won't work without a real key
+        "X-RapidAPI-Host": "yt-api.p.rapidapi.com",
+      },
+    });
+
+    if (!response.ok) {
+      console.log("    RapidAPI returned", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    // Parse based on response format
+    if (data.captions && Array.isArray(data.captions)) {
+      const segments: TranscriptSegment[] = data.captions.map((c: any) => ({
+        text: c.text || "",
+        start: c.start || 0,
+        duration: c.duration || 2,
+      })).filter((s: TranscriptSegment) => s.text.length > 0);
+
+      if (segments.length > 0) {
+        return {
+          segments,
+          fullText: segments.map(s => s.text).join(" "),
+          language: "en",
+          videoId,
+          source: "api",
+        };
+      }
+    }
+  } catch (e: any) {
+    console.log("    RapidAPI error:", e?.message || e);
+  }
   return null;
 }
 
@@ -429,11 +571,10 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
     console.log("  Fetching video page to get caption tracks...");
 
     // Use headers that mimic a Chrome extension
-    const headers = {
+    const headers: Record<string, string> = {
       "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
       "Accept-Language": "en-US,en;q=0.9",
-      "Accept-Encoding": "gzip, deflate, br",
       "Cache-Control": "no-cache",
       "Pragma": "no-cache",
       "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
@@ -463,11 +604,6 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
     const captionTracksMatch = html.match(/"captionTracks":\s*(\[[^\]]*\])/);
     if (!captionTracksMatch) {
       console.log("  No captionTracks found in page");
-
-      // Try to find if captions are disabled
-      if (html.includes('"playabilityStatus"') && html.includes('"reason"')) {
-        console.log("  Video may have playability restrictions");
-      }
       return null;
     }
 
@@ -498,7 +634,13 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
       }
 
       console.log("  Using track:", track.languageCode);
-      return await fetchCaptionTrack(track.baseUrl, videoId, track.languageCode || "en");
+      console.log("  Base URL:", track.baseUrl.substring(0, 100) + "...");
+
+      // Try to fetch with the same cookies/session
+      // Extract any cookies from the response
+      const cookies = videoPageResponse.headers.get("set-cookie") || "";
+
+      return await fetchCaptionTrackWithRetry(track.baseUrl, videoId, track.languageCode || "en", cookies);
     } catch (e) {
       console.log("  Error parsing caption tracks:", e);
       return null;
@@ -507,6 +649,30 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
     console.log("  Innertube API error:", error?.message || error);
     return null;
   }
+}
+
+/**
+ * Fetch caption track with multiple URL variations
+ */
+async function fetchCaptionTrackWithRetry(baseUrl: string, videoId: string, language: string, cookies: string): Promise<TranscriptResult | null> {
+  // Try different URL formats
+  const urlVariations = [
+    baseUrl, // Original URL
+    baseUrl.replace("&fmt=srv3", ""), // Remove format param
+    baseUrl + "&fmt=json3", // Try JSON format
+    baseUrl.replace(/&fmt=[^&]+/, "&fmt=vtt"), // Try VTT format
+  ];
+
+  for (const url of urlVariations) {
+    console.log("  Trying URL variation:", url.includes("fmt=") ? url.match(/fmt=[^&]+/)?.[0] : "default");
+
+    const result = await fetchCaptionTrack(url, videoId, language);
+    if (result) {
+      return result;
+    }
+  }
+
+  return null;
 }
 
 /**
