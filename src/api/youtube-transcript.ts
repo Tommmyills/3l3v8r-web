@@ -56,6 +56,19 @@ async function getCachedTranscript(videoId: string): Promise<TranscriptResult | 
       const ageInDays = (now - timestamp) / (1000 * 60 * 60 * 24);
 
       if (ageInDays < CACHE_EXPIRY_DAYS) {
+        // Validate cached data - must have at least 5 segments and 200 chars
+        const isValid = data &&
+          data.segments &&
+          data.segments.length >= 5 &&
+          data.fullText &&
+          data.fullText.length >= 200;
+
+        if (!isValid) {
+          console.log("🗑️ Cached transcript invalid (too short), removing:", videoId);
+          await AsyncStorage.removeItem(cacheKey);
+          return null;
+        }
+
         console.log("✅ Using cached transcript for", videoId, `(${ageInDays.toFixed(1)} days old)`);
         return data;
       } else {
