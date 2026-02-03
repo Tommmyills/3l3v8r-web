@@ -213,10 +213,16 @@ function parseSearchAPIResponse(data: string, videoId: string): TranscriptResult
 }
 
 /**
- * Parse response from downsub.com
+ * Parse response from downsub.com (can be JSON or HTML)
  */
 function parseDownsubResponse(data: string, videoId: string): TranscriptResult | null {
   try {
+    // Check if it's HTML (error page)
+    if (data.trim().startsWith("<") || data.includes("<!DOCTYPE")) {
+      console.log("  downsub.com returned HTML, not JSON");
+      return null;
+    }
+
     const json = JSON.parse(data);
     if (json.subtitles || json.data) {
       const subs = json.subtitles || json.data;
