@@ -422,17 +422,33 @@ function decodeHTMLEntities(text: string): string {
 /**
  * METHOD 2: Direct Innertube API (most reliable as of 2025)
  * This uses YouTube's internal API that powers the web player
+ * Mimics Chrome extension behavior for better success rate
  */
 async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null> {
   try {
     console.log("  Fetching video page to get caption tracks...");
 
+    // Use headers that mimic a Chrome extension
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept-Encoding": "gzip, deflate, br",
+      "Cache-Control": "no-cache",
+      "Pragma": "no-cache",
+      "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"macOS"',
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "none",
+      "Sec-Fetch-User": "?1",
+      "Upgrade-Insecure-Requests": "1",
+    };
+
     // First, get the video page to extract caption track info
     const videoPageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
+      headers,
     });
 
     if (!videoPageResponse.ok) {
@@ -441,67 +457,50 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
     }
 
     const html = await videoPageResponse.text();
+    console.log("  Video page length:", html.length);
 
-    // Extract captions data from the page
-    const captionsMatch = html.match(/"captions":\s*(\{[^}]+?"playerCaptionsTracklistRenderer"[^}]+?\})/);
-    if (!captionsMatch) {
-      // Try alternative pattern
-      const altMatch = html.match(/\"captionTracks\":\s*(\[[^\]]+\])/);
-      if (!altMatch) {
-        console.log("  No captions data found in page");
-        return null;
+    // Look for captionTracks in the page
+    const captionTracksMatch = html.match(/"captionTracks":\s*(\[[^\]]*\])/);
+    if (!captionTracksMatch) {
+      console.log("  No captionTracks found in page");
+
+      // Try to find if captions are disabled
+      if (html.includes('"playabilityStatus"') && html.includes('"reason"')) {
+        console.log("  Video may have playability restrictions");
       }
-
-      try {
-        const captionTracks = JSON.parse(altMatch[1]);
-        if (!captionTracks || captionTracks.length === 0) {
-          console.log("  No caption tracks available");
-          return null;
-        }
-
-        // Find English track or first available
-        const track = captionTracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"))
-          || captionTracks[0];
-
-        if (!track?.baseUrl) {
-          console.log("  No valid caption track URL");
-          return null;
-        }
-
-        return await fetchCaptionTrack(track.baseUrl, videoId, track.languageCode || "en");
-      } catch (e) {
-        console.log("  Error parsing caption tracks:", e);
-        return null;
-      }
+      return null;
     }
 
-    // Parse the captions JSON
     try {
-      // Extract just the captionTracks array
-      const tracksMatch = html.match(/\"captionTracks\":\s*(\[[^\]]*\])/);
-      if (!tracksMatch) {
-        console.log("  Could not extract caption tracks array");
+      const captionTracks = JSON.parse(captionTracksMatch[1]);
+      console.log("  Found", captionTracks.length, "caption tracks");
+
+      if (!captionTracks || captionTracks.length === 0) {
+        console.log("  Empty caption tracks array");
         return null;
       }
 
-      const captionTracks = JSON.parse(tracksMatch[1]);
-      if (!captionTracks || captionTracks.length === 0) {
-        console.log("  Empty caption tracks");
-        return null;
+      // Log available tracks
+      for (const track of captionTracks) {
+        console.log("    Track:", track.languageCode, track.name?.simpleText || "");
       }
 
       // Find English track or first available
-      const track = captionTracks.find((t: any) => t.languageCode === "en" || t.languageCode?.startsWith("en"))
-        || captionTracks[0];
+      const track = captionTracks.find((t: any) =>
+        t.languageCode === "en" ||
+        t.languageCode?.startsWith("en") ||
+        t.vssId?.includes(".en")
+      ) || captionTracks[0];
 
       if (!track?.baseUrl) {
-        console.log("  No baseUrl in caption track");
+        console.log("  No baseUrl in selected track");
         return null;
       }
 
+      console.log("  Using track:", track.languageCode);
       return await fetchCaptionTrack(track.baseUrl, videoId, track.languageCode || "en");
     } catch (e) {
-      console.log("  Error parsing captions JSON:", e);
+      console.log("  Error parsing caption tracks:", e);
       return null;
     }
   } catch (error: any) {
@@ -515,17 +514,22 @@ async function tryInnertubeAPI(videoId: string): Promise<TranscriptResult | null
  */
 async function fetchCaptionTrack(baseUrl: string, videoId: string, language: string): Promise<TranscriptResult | null> {
   try {
-    // Try XML format first (more reliable), then JSON
-    // Remove any existing fmt parameter and request XML
-    let url = baseUrl;
+    console.log("  Fetching caption track...");
 
-    console.log("  Fetching caption track (XML format)...");
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/xml, application/xml, */*",
-      },
-    });
+    // Use Chrome-like headers
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Accept": "text/xml, application/xml, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+      "Sec-Ch-Ua-Mobile": "?0",
+      "Sec-Ch-Ua-Platform": '"macOS"',
+      "Sec-Fetch-Dest": "empty",
+      "Sec-Fetch-Mode": "cors",
+      "Sec-Fetch-Site": "same-origin",
+    };
+
+    const response = await fetch(baseUrl, { headers });
 
     if (!response.ok) {
       console.log("  Caption track fetch failed:", response.status);
@@ -533,7 +537,15 @@ async function fetchCaptionTrack(baseUrl: string, videoId: string, language: str
     }
 
     const text = await response.text();
-    console.log("  Response length:", text.length, "chars, starts with:", text.slice(0, 100));
+    console.log("  Caption response length:", text.length, "chars");
+
+    if (text.length === 0) {
+      console.log("  Empty response from caption track");
+      return null;
+    }
+
+    // Log first 200 chars for debugging
+    console.log("  Response preview:", text.slice(0, 200).replace(/\n/g, " "));
 
     // Try XML format first (YouTube's default)
     if (text.includes("<transcript>") || text.includes("<text ") || text.includes("<?xml")) {
@@ -594,7 +606,7 @@ async function fetchCaptionTrack(baseUrl: string, videoId: string, language: str
       };
     }
 
-    console.log("  Could not parse caption track response. Sample:", text.slice(0, 300));
+    console.log("  Could not parse caption track response");
     return null;
   } catch (error: any) {
     console.log("  Error fetching caption track:", error?.message || error);
