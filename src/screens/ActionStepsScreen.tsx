@@ -97,11 +97,11 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
         }
 
         if (!transcriptResult || !transcriptResult.segments || transcriptResult.segments.length === 0) {
-          throw new Error("This video does not have captions available. Action steps can only be generated for videos with closed captions enabled.");
+          throw new Error("YouTube is currently blocking transcript access. This is a temporary issue affecting all transcript services. Please try again later or try a different video.");
         }
 
         if (transcriptResult.segments.length < 5 || transcriptResult.fullText.length < 200) {
-          throw new Error("Could not fetch a complete transcript for this video. The caption service may be temporarily unavailable. Please try again later.");
+          throw new Error("YouTube is currently blocking transcript access. This is a temporary issue affecting all transcript services. Please try again later.");
         }
 
         // Generate lesson breakdown
@@ -341,7 +341,7 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
                 className="text-gray-200 text-lg text-center mb-3 font-semibold"
                 style={{ letterSpacing: 0.5 }}
               >
-                No Captions Available
+                Transcript Unavailable
               </Text>
               <Text
                 className="text-gray-400 text-sm text-center mb-6"

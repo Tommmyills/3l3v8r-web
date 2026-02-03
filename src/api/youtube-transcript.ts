@@ -108,6 +108,16 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
   // Try multiple public APIs - ordered by reliability
   const apis = [
     {
+      name: "searchapi.io",
+      url: `https://www.searchapi.io/api/v1/search?engine=youtube_transcripts&video_id=${videoId}`,
+      parser: parseSearchAPIResponse,
+    },
+    {
+      name: "downsub.com",
+      url: `https://downsub.com/api/get-subs?url=https://www.youtube.com/watch?v=${videoId}&type=auto`,
+      parser: parseDownsubResponse,
+    },
+    {
       name: "tactiq.io",
       url: `https://tactiq-apps-prod.tactiq.io/transcript?videoId=${videoId}&langCode=en`,
       parser: parseTactiqResponse,
@@ -117,11 +127,6 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
       url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
       parser: parseYoutubeTranscriptCom,
     },
-    {
-      name: "kome.ai",
-      url: `https://kome.ai/api/transcript?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-      parser: parseKomeAI,
-    },
   ];
 
   for (const api of apis) {
@@ -129,10 +134,9 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
       console.log(`  Trying ${api.name}...`);
       const response = await fetch(api.url, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-          "Accept": "application/json, text/html, */*",
-          "Origin": "https://tactiq.io",
-          "Referer": "https://tactiq.io/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/html, text/xml, */*",
+          "Accept-Language": "en-US,en;q=0.9",
         },
       });
 
@@ -163,6 +167,80 @@ async function tryTranscriptAPI(videoId: string): Promise<TranscriptResult | nul
     }
   }
 
+  return null;
+}
+
+/**
+ * Parse response from searchapi.io
+ */
+function parseSearchAPIResponse(data: string, videoId: string): TranscriptResult | null {
+  try {
+    const json = JSON.parse(data);
+    if (json.transcripts && Array.isArray(json.transcripts) && json.transcripts.length > 0) {
+      const transcript = json.transcripts[0];
+      if (transcript.text) {
+        // Single text block
+        return {
+          segments: [{ text: transcript.text, start: 0, duration: 0 }],
+          fullText: transcript.text,
+          language: transcript.language || "en",
+          videoId,
+          source: "api",
+        };
+      }
+      if (transcript.segments && Array.isArray(transcript.segments)) {
+        const segments: TranscriptSegment[] = transcript.segments.map((s: any) => ({
+          text: s.text || "",
+          start: s.start || 0,
+          duration: s.duration || 2,
+        })).filter((s: TranscriptSegment) => s.text.length > 0);
+
+        if (segments.length > 0) {
+          return {
+            segments,
+            fullText: segments.map(s => s.text).join(" "),
+            language: transcript.language || "en",
+            videoId,
+            source: "api",
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.log("  Error parsing searchapi.io:", e);
+  }
+  return null;
+}
+
+/**
+ * Parse response from downsub.com
+ */
+function parseDownsubResponse(data: string, videoId: string): TranscriptResult | null {
+  try {
+    const json = JSON.parse(data);
+    if (json.subtitles || json.data) {
+      const subs = json.subtitles || json.data;
+      if (Array.isArray(subs) && subs.length > 0) {
+        const segments: TranscriptSegment[] = subs.map((s: any) => ({
+          text: s.text || s.content || "",
+          start: (s.start || s.startTime || 0) / 1000,
+          duration: (s.duration || s.dur || 2000) / 1000,
+        })).filter((s: TranscriptSegment) => s.text.length > 0);
+
+        if (segments.length > 0) {
+          return {
+            segments,
+            fullText: segments.map(s => s.text).join(" "),
+            language: "en",
+            videoId,
+            source: "api",
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.log("  Error parsing downsub.com:", e);
+  }
   return null;
 }
 
