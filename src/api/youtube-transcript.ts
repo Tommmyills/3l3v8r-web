@@ -101,6 +101,72 @@ export async function cacheTranscript(videoId: string, transcript: TranscriptRes
 }
 
 /**
+ * METHOD 0.5: Use TranscriptAPI.com (paid service with API key)
+ * This is the most reliable method - uses EXPO_PUBLIC_YouTube_Transcriber_API_Key
+ */
+async function tryTranscriberAPI(videoId: string): Promise<TranscriptResult | null> {
+  const apiKey = process.env.EXPO_PUBLIC_YouTube_Transcriber_API_Key;
+
+  if (!apiKey) {
+    console.log("  No TranscriptAPI key found, skipping...");
+    return null;
+  }
+
+  try {
+    console.log("  Calling TranscriptAPI.com...");
+
+    const url = `https://transcriptapi.com/api/v2/youtube/transcript?video_url=${videoId}&format=json&include_timestamp=true`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.log("  TranscriptAPI returned", response.status);
+      const errorText = await response.text();
+      console.log("  Error response:", errorText.slice(0, 200));
+      return null;
+    }
+
+    const data = await response.json();
+    console.log("  TranscriptAPI response received, video_id:", data.video_id);
+
+    if (!data.transcript || !Array.isArray(data.transcript) || data.transcript.length === 0) {
+      console.log("  TranscriptAPI returned empty transcript");
+      return null;
+    }
+
+    const segments: TranscriptSegment[] = data.transcript.map((item: any) => ({
+      text: item.text || "",
+      start: item.start || 0,
+      duration: item.duration || 2,
+    })).filter((s: TranscriptSegment) => s.text.length > 0);
+
+    if (segments.length < 5) {
+      console.log("  TranscriptAPI returned only", segments.length, "segments (too few)");
+      return null;
+    }
+
+    console.log("  TranscriptAPI success:", segments.length, "segments");
+
+    return {
+      segments,
+      fullText: segments.map(s => s.text).join(" "),
+      language: data.language || "en",
+      videoId,
+      source: "api",
+    };
+  } catch (error: any) {
+    console.log("  TranscriptAPI error:", error?.message || error);
+    return null;
+  }
+}
+
+/**
  * METHOD 1: Use public transcript API services
  * These services act as proxies and can bypass YouTube's restrictions
  */
@@ -869,7 +935,26 @@ export async function fetchYoutubeTranscript(
       return cached;
     }
 
-    // METHOD 1: Try transcript API services (most reliable - bypasses YouTube blocks)
+    // METHOD 0.5: Try TranscriptAPI.com (paid service - most reliable)
+    try {
+      console.log("⏳ METHOD 0.5: Trying TranscriptAPI.com...");
+      const result = await Promise.race([
+        tryTranscriberAPI(videoId),
+        timeout(FETCH_TIMEOUT, "Method 0.5 timeout")
+      ]);
+
+      if (result) {
+        console.log("✅ METHOD 0.5: Success -", result.segments.length, "segments");
+        await cacheTranscript(videoId, result);
+        return result;
+      } else {
+        console.log("❌ METHOD 0.5 returned null/empty");
+      }
+    } catch (error: any) {
+      console.log("❌ METHOD 0.5 failed:", error?.message || "Unknown error");
+    }
+
+    // METHOD 1: Try transcript API services (fallback - bypasses YouTube blocks)
     try {
       console.log("⏳ METHOD 1: Trying transcript API services...");
       const result = await Promise.race([

@@ -458,11 +458,14 @@ Quick access to your saved videos without searching again:
   - **YouTube Volume Controller** - Continuous volume monitoring (100ms intervals)
   - **Dual-channel mixing** - Independent gain control for YouTube and local audio
 - **AI-Powered Features** - Advanced transcript analysis with OpenAI GPT-4o:
-  - YouTube transcript extraction with **bulletproof dual-method fallback system**:
+  - YouTube transcript extraction with **bulletproof multi-method fallback system**:
     - Method 0: Cache (instant loading)
-    - Method 1: youtube-caption-extractor (fast, works on most videos)
-    - Method 2: youtube-transcript package (reliable fallback)
-  - **15-second timeout per method** - prevents infinite loading
+    - Method 0.5: **TranscriptAPI.com** (paid API - most reliable, uses EXPO_PUBLIC_YouTube_Transcriber_API_Key)
+    - Method 1: Public transcript proxy APIs (downsub, tactiq, allorigins)
+    - Method 2: YouTube Innertube API (direct caption extraction)
+    - Method 3: youtube-caption-extractor package (legacy fallback)
+    - Method 4: youtube-transcript package (legacy fallback)
+  - **20-second timeout per method** - prevents infinite loading
   - **Smart caching system** - Transcripts cached locally for 7 days for instant loading
   - Offline transcript access after first download
   - Smart summarization with key topics
