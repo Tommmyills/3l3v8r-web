@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from "react";
-import { View, Text, Pressable, Animated } from "react-native";
+import React, { useRef, useState } from "react";
+import { View, Text, Pressable } from "react-native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,52 +13,6 @@ export const YouTubeViewScreen: React.FC = () => {
   const [canGoBack, setCanGoBack] = useState(false);
 
   const audioMode = useAppStore((s) => s.audioMode);
-
-  // Simple pulse animation using React Native Animated
-  const pulseAnim = useRef(new Animated.Value(0.6)).current;
-  const glowAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    // Pulse animation
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.6,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    // Glow scale animation
-    const glowAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1.15,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    pulseAnimation.start();
-    glowAnimation.start();
-
-    return () => {
-      pulseAnimation.stop();
-      glowAnimation.stop();
-    };
-  }, [pulseAnim, glowAnim]);
 
   // Get mode colors
   const getModeColor = () => {
@@ -156,34 +110,31 @@ export const YouTubeViewScreen: React.FC = () => {
           }}
         >
           {/* Glow effect behind logo */}
-          <Animated.View
+          <View
             style={{
               position: "absolute",
               width: 200,
               height: 200,
               borderRadius: 100,
               backgroundColor: accentColor,
-              opacity: 0.15,
-              transform: [{ scale: glowAnim }],
+              opacity: 0.12,
             }}
           />
 
           {/* Main Logo */}
-          <Animated.View style={{ opacity: pulseAnim }}>
-            <Text
-              style={{
-                fontSize: 48,
-                fontWeight: "900",
-                letterSpacing: 8,
-                color: accentColor,
-                textShadowColor: accentColor,
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 20,
-              }}
-            >
-              3L3V8R
-            </Text>
-          </Animated.View>
+          <Text
+            style={{
+              fontSize: 48,
+              fontWeight: "900",
+              letterSpacing: 8,
+              color: accentColor,
+              textShadowColor: accentColor,
+              textShadowOffset: { width: 0, height: 0 },
+              textShadowRadius: 20,
+            }}
+          >
+            3L3V8R
+          </Text>
 
           {/* Subtitle */}
           <Text
