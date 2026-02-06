@@ -26,7 +26,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { TranscriptResult, cacheTranscript } from "../api/youtube-transcript";
+import { TranscriptResult, cacheTranscript, fetchYoutubeTranscript } from "../api/youtube-transcript";
 import { generateLessonBreakdown, LessonBreakdown } from "../api/transcript-ai";
 import { useLessonBreakdownStore } from "../state/actionStepsStore";
 import { useAppStore } from "../state/appStore";
@@ -120,19 +120,52 @@ export const ActionStepsScreen: React.FC<ActionStepsScreenProps> = ({
           return;
         }
 
-        // Start with WebView approach directly since other methods are being blocked
-        // This gives us the best chance of getting transcripts via browser context
+        // Try fetchYoutubeTranscript first (uses TranscriptAPI + other fallbacks)
+        console.log("Fetching transcript via fetchYoutubeTranscript...");
+        setLoading(true);
+        setLoadingStatus("Fetching transcript...");
+
+        const transcript = await fetchYoutubeTranscript(videoId);
+
+        if (transcript && transcript.segments && transcript.segments.length >= 5) {
+          console.log("Got transcript:", transcript.segments.length, "segments, source:", transcript.source);
+          setLoadingStatus("Generating lesson breakdown...");
+
+          // Generate lesson breakdown
+          const fullText = transcript.segments.map((s) => s.text).join(" ");
+          const breakdown = await generateLessonBreakdown(fullText, videoTitle);
+
+          setLessonBreakdown(breakdown);
+          saveLessonBreakdown(videoId, videoTitle, breakdown);
+          setLoading(false);
+          return;
+        }
+
+        // If fetchYoutubeTranscript failed, try WebView fallback
         if (!webViewAttempted) {
-          console.log("Starting WebView transcript fetch...");
-          setLoading(true);
-          setLoadingStatus("Loading transcript...");
+          console.log("fetchYoutubeTranscript failed, trying WebView fallback...");
+          setLoadingStatus("Trying alternative method...");
           setWebViewAttempted(true);
           setUseWebViewFallback(true);
           return; // WebView will call handleWebViewTranscript when done
         }
 
+        // Both methods failed
+        setError("Could not fetch transcript. This video may not have captions available.");
+        setLoading(false);
+
       } catch (err) {
         console.error("Error loading lesson breakdown:", err);
+
+        // Try WebView as fallback on error
+        if (!webViewAttempted) {
+          console.log("Error occurred, trying WebView fallback...");
+          setLoadingStatus("Trying alternative method...");
+          setWebViewAttempted(true);
+          setUseWebViewFallback(true);
+          return;
+        }
+
         setError(err instanceof Error ? err.message : "Failed to load lesson breakdown");
         setLoading(false);
       }
