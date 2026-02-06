@@ -11,7 +11,59 @@ export type VoiceStyle =
   | "energetic"
   | "deep";
 
-export type Language = "en" | "es" | "de" | "fr" | "pt" | "ja" | "zh-CN";
+export type Language =
+  | "en"    // English
+  | "es"    // Spanish
+  | "de"    // German
+  | "fr"    // French
+  | "pt"    // Portuguese
+  | "ja"    // Japanese
+  | "zh-CN" // Chinese (Simplified)
+  | "zh-TW" // Chinese (Traditional)
+  | "ko"    // Korean
+  | "ar"    // Arabic
+  | "hi"    // Hindi
+  | "ru"    // Russian
+  | "it"    // Italian
+  | "nl"    // Dutch
+  | "pl"    // Polish
+  | "tr"    // Turkish
+  | "vi"    // Vietnamese
+  | "th"    // Thai
+  | "id"    // Indonesian
+  | "ms"    // Malay
+  | "sv"    // Swedish
+  | "da"    // Danish
+  | "no"    // Norwegian
+  | "fi"    // Finnish
+  | "el"    // Greek
+  | "he"    // Hebrew
+  | "cs"    // Czech
+  | "ro"    // Romanian
+  | "hu"    // Hungarian
+  | "uk"    // Ukrainian
+  | "bn"    // Bengali
+  | "ta"    // Tamil
+  | "te"    // Telugu
+  | "mr"    // Marathi
+  | "gu"    // Gujarati
+  | "kn"    // Kannada
+  | "ml"    // Malayalam
+  | "pa"    // Punjabi
+  | "ur"    // Urdu
+  | "fa"    // Persian/Farsi
+  | "sw"    // Swahili
+  | "tl"    // Tagalog/Filipino
+  | "af"    // Afrikaans
+  | "ca"    // Catalan
+  | "hr"    // Croatian
+  | "sk"    // Slovak
+  | "sl"    // Slovenian
+  | "bg"    // Bulgarian
+  | "sr"    // Serbian
+  | "lt"    // Lithuanian
+  | "lv"    // Latvian
+  | "et"    // Estonian;
 
 interface VoiceAssistState {
   // Voice Assist Settings

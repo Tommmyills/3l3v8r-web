@@ -13,13 +13,65 @@ interface VoiceAssistModalProps {
   modeColor: string;
 }
 
-const LANGUAGE_OPTIONS: { value: Language; label: string }[] = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "de", label: "German" },
-  { value: "pt", label: "Portuguese" },
-  { value: "ja", label: "Japanese" },
-  { value: "zh-CN", label: "Chinese" },
+const LANGUAGE_OPTIONS: { value: Language; label: string; region: string }[] = [
+  // Major World Languages
+  { value: "en", label: "English", region: "Popular" },
+  { value: "es", label: "Spanish", region: "Popular" },
+  { value: "zh-CN", label: "Chinese (Simplified)", region: "Popular" },
+  { value: "zh-TW", label: "Chinese (Traditional)", region: "Popular" },
+  { value: "hi", label: "Hindi", region: "Popular" },
+  { value: "ar", label: "Arabic", region: "Popular" },
+  { value: "pt", label: "Portuguese", region: "Popular" },
+  { value: "fr", label: "French", region: "Popular" },
+  { value: "de", label: "German", region: "Popular" },
+  { value: "ja", label: "Japanese", region: "Popular" },
+  { value: "ko", label: "Korean", region: "Popular" },
+  { value: "ru", label: "Russian", region: "Popular" },
+  { value: "it", label: "Italian", region: "Popular" },
+  // European
+  { value: "nl", label: "Dutch", region: "Europe" },
+  { value: "pl", label: "Polish", region: "Europe" },
+  { value: "sv", label: "Swedish", region: "Europe" },
+  { value: "da", label: "Danish", region: "Europe" },
+  { value: "no", label: "Norwegian", region: "Europe" },
+  { value: "fi", label: "Finnish", region: "Europe" },
+  { value: "el", label: "Greek", region: "Europe" },
+  { value: "cs", label: "Czech", region: "Europe" },
+  { value: "ro", label: "Romanian", region: "Europe" },
+  { value: "hu", label: "Hungarian", region: "Europe" },
+  { value: "uk", label: "Ukrainian", region: "Europe" },
+  { value: "hr", label: "Croatian", region: "Europe" },
+  { value: "sk", label: "Slovak", region: "Europe" },
+  { value: "sl", label: "Slovenian", region: "Europe" },
+  { value: "bg", label: "Bulgarian", region: "Europe" },
+  { value: "sr", label: "Serbian", region: "Europe" },
+  { value: "lt", label: "Lithuanian", region: "Europe" },
+  { value: "lv", label: "Latvian", region: "Europe" },
+  { value: "et", label: "Estonian", region: "Europe" },
+  { value: "ca", label: "Catalan", region: "Europe" },
+  // Middle East
+  { value: "he", label: "Hebrew", region: "Middle East" },
+  { value: "tr", label: "Turkish", region: "Middle East" },
+  { value: "fa", label: "Persian", region: "Middle East" },
+  { value: "ur", label: "Urdu", region: "Middle East" },
+  // South Asia
+  { value: "bn", label: "Bengali", region: "South Asia" },
+  { value: "ta", label: "Tamil", region: "South Asia" },
+  { value: "te", label: "Telugu", region: "South Asia" },
+  { value: "mr", label: "Marathi", region: "South Asia" },
+  { value: "gu", label: "Gujarati", region: "South Asia" },
+  { value: "kn", label: "Kannada", region: "South Asia" },
+  { value: "ml", label: "Malayalam", region: "South Asia" },
+  { value: "pa", label: "Punjabi", region: "South Asia" },
+  // Southeast Asia
+  { value: "vi", label: "Vietnamese", region: "SE Asia" },
+  { value: "th", label: "Thai", region: "SE Asia" },
+  { value: "id", label: "Indonesian", region: "SE Asia" },
+  { value: "ms", label: "Malay", region: "SE Asia" },
+  { value: "tl", label: "Filipino", region: "SE Asia" },
+  // Africa
+  { value: "sw", label: "Swahili", region: "Africa" },
+  { value: "af", label: "Afrikaans", region: "Africa" },
 ];
 
 export const VoiceAssistModal: React.FC<VoiceAssistModalProps> = ({
@@ -168,43 +220,60 @@ export const VoiceAssistModal: React.FC<VoiceAssistModalProps> = ({
                 className="text-xs text-gray-400 mb-3 tracking-wider"
                 style={{ fontFamily: "monospace" }}
               >
-                TRANSLATE TO
+                TRANSLATE TO ({LANGUAGE_OPTIONS.length} LANGUAGES)
               </Text>
-              <View className="flex-row flex-wrap" style={{ gap: 8 }}>
-                {LANGUAGE_OPTIONS.map((lang) => (
-                  <Pressable
-                    key={`output-${lang.value}`}
-                    onPress={() => {
-                      console.log("[TextTranslator] Language selected:", lang.value);
-                      Haptics.notificationAsync(
-                        Haptics.NotificationFeedbackType.Success
-                      );
-                      setTargetLang(lang.value);
-                    }}
-                    className="border px-4 py-2.5 rounded-xl"
-                    style={{
-                      borderColor:
-                        targetLang === lang.value
-                          ? modeColor
-                          : "rgba(255,255,255,0.1)",
-                      backgroundColor:
-                        targetLang === lang.value
-                          ? `${modeColor}15`
-                          : "rgba(0,0,0,0.3)",
-                    }}
-                  >
+
+              {/* Group languages by region */}
+              {["Popular", "Europe", "Middle East", "South Asia", "SE Asia", "Africa"].map((region) => {
+                const regionLangs = LANGUAGE_OPTIONS.filter((l) => l.region === region);
+                if (regionLangs.length === 0) return null;
+
+                return (
+                  <View key={region} className="mb-4">
                     <Text
-                      className="text-xs font-semibold"
-                      style={{
-                        color: targetLang === lang.value ? modeColor : "#999",
-                        letterSpacing: 0.5,
-                      }}
+                      className="text-xs mb-2"
+                      style={{ color: "#666", fontFamily: "monospace" }}
                     >
-                      {lang.label}
+                      {region.toUpperCase()}
                     </Text>
-                  </Pressable>
-                ))}
-              </View>
+                    <View className="flex-row flex-wrap" style={{ gap: 6 }}>
+                      {regionLangs.map((lang) => (
+                        <Pressable
+                          key={`output-${lang.value}`}
+                          onPress={() => {
+                            console.log("[TextTranslator] Language selected:", lang.value);
+                            Haptics.notificationAsync(
+                              Haptics.NotificationFeedbackType.Success
+                            );
+                            setTargetLang(lang.value);
+                          }}
+                          className="border px-3 py-2 rounded-xl"
+                          style={{
+                            borderColor:
+                              targetLang === lang.value
+                                ? modeColor
+                                : "rgba(255,255,255,0.1)",
+                            backgroundColor:
+                              targetLang === lang.value
+                                ? `${modeColor}15`
+                                : "rgba(0,0,0,0.3)",
+                          }}
+                        >
+                          <Text
+                            className="text-xs font-semibold"
+                            style={{
+                              color: targetLang === lang.value ? modeColor : "#999",
+                              letterSpacing: 0.3,
+                            }}
+                          >
+                            {lang.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </View>
         </ScrollView>
