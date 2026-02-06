@@ -61,18 +61,34 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         style={[
           {
             fontFamily: "monospace",
-            fontSize: 48,
+            fontSize: 52,
             fontWeight: "bold",
-            letterSpacing: 6,
+            letterSpacing: 8,
             color: neonColor,
             textShadowColor: neonColor,
             textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 20,
+            textShadowRadius: 30,
           },
           animatedStyle,
         ]}
       >
-        3L3V8R
+        ELEVATE
+      </Animated.Text>
+      <Animated.Text
+        style={[
+          {
+            fontFamily: "monospace",
+            fontSize: 12,
+            fontWeight: "500",
+            letterSpacing: 6,
+            color: neonColor,
+            opacity: 0.5,
+            marginTop: 12,
+          },
+          animatedStyle,
+        ]}
+      >
+        YOUR LEARNING
       </Animated.Text>
     </View>
   );

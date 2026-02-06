@@ -1361,18 +1361,18 @@ export const MixwaveScreen: React.FC = () => {
                         style={[
                           {
                             fontFamily: "monospace",
-                            fontSize: 42,
+                            fontSize: 38,
                             fontWeight: "bold",
-                            letterSpacing: 6,
+                            letterSpacing: 8,
                             color: modeColors.accent,
                             textShadowColor: modeColors.glow,
                             textShadowOffset: { width: 0, height: 0 },
-                            textShadowRadius: 25,
+                            textShadowRadius: 30,
                           },
                           animatedLoadingLogoStyle,
                         ]}
                       >
-                        3L3V8R
+                        ELEVATE
                       </AnimatedText>
                     </Animated.View>
                   )}
@@ -1385,7 +1385,7 @@ export const MixwaveScreen: React.FC = () => {
                 >
                   <View
                     className="absolute inset-0"
-                    style={{ backgroundColor: "rgba(0,0,0,0.60)" }}
+                    style={{ backgroundColor: "rgba(0,0,0,0.70)" }}
                   />
                   <Pressable
                     onPress={() => {
@@ -1394,12 +1394,40 @@ export const MixwaveScreen: React.FC = () => {
                     }}
                     className="flex-1 items-center justify-center"
                   >
-                    <View className="border border-dashed px-8 py-5" style={{ borderColor: "#333" }}>
+                    <Text
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 36,
+                        fontWeight: "bold",
+                        letterSpacing: 8,
+                        color: modeColors.accent,
+                        textShadowColor: modeColors.glow,
+                        textShadowOffset: { width: 0, height: 0 },
+                        textShadowRadius: 25,
+                        marginBottom: 8,
+                      }}
+                    >
+                      ELEVATE
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 10,
+                        fontWeight: "500",
+                        letterSpacing: 4,
+                        color: modeColors.accent,
+                        opacity: 0.5,
+                        marginBottom: 24,
+                      }}
+                    >
+                      YOUR LEARNING
+                    </Text>
+                    <View className="border border-dashed px-8 py-4 rounded-xl" style={{ borderColor: `${modeColors.accent}40` }}>
                       <Text
-                        className="text-gray-600 text-xs font-bold text-center tracking-widest"
-                        style={{ fontFamily: "monospace" }}
+                        className="text-xs font-bold text-center tracking-widest"
+                        style={{ fontFamily: "monospace", color: modeColors.accent, opacity: 0.8 }}
                       >
-                        [ LOAD VIDEO ]
+                        TAP TO LOAD VIDEO
                       </Text>
                     </View>
                   </Pressable>
@@ -1960,14 +1988,14 @@ export const MixwaveScreen: React.FC = () => {
 
             {/* Audio Source Selector - Horizontal */}
             {!musicSource && (
-              <View className="p-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(255,255,255,0.02)" }}>
+              <View className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(0,0,0,0.3)" }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row" style={{ gap: 8 }}>
+                  <View className="flex-row" style={{ gap: 10 }}>
                     {[
-                      { id: "local", label: "LOCAL MP3", color: modeColors.accent },
-                      { id: "bandcamp", label: "BANDCAMP", color: "#1DA0C3" },
-                      { id: "mixcloud", label: "MIXCLOUD", color: "#FF7F00" },
-                      { id: "apple-music", label: "APPLE MUSIC", color: "#FC3C44" },
+                      { id: "local", label: "LOCAL MP3", icon: "musical-notes", color: modeColors.accent },
+                      { id: "bandcamp", label: "BANDCAMP", icon: "radio", color: "#1DA0C3" },
+                      { id: "mixcloud", label: "MIXCLOUD", icon: "cloud", color: "#FF7F00" },
+                      { id: "apple-music", label: "APPLE", icon: "logo-apple", color: "#FC3C44" },
                     ].map((source) => (
                       <Pressable
                         key={source.id}
@@ -1975,21 +2003,26 @@ export const MixwaveScreen: React.FC = () => {
                           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                           setMusicSource(source.id as MusicSource);
                         }}
-                        className="border px-5 py-3 rounded-2xl"
+                        className="border px-4 py-3 rounded-2xl flex-row items-center"
                         style={{
-                          borderColor: "rgba(255,255,255,0.15)",
-                          backgroundColor: "rgba(0,0,0,0.4)",
+                          borderColor: `${source.color}40`,
+                          backgroundColor: `${source.color}15`,
                           shadowColor: source.color,
-                          shadowOffset: { width: 0, height: 2 },
-                          shadowOpacity: 0.2,
-                          shadowRadius: 8,
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.35,
+                          shadowRadius: 12,
+                          gap: 8,
                         }}
                       >
+                        <Ionicons name={source.icon as any} size={16} color={source.color} />
                         <Text
                           className="text-xs font-bold tracking-wider whitespace-nowrap"
                           style={{
                             fontFamily: "monospace",
                             color: source.color,
+                            textShadowColor: source.color,
+                            textShadowOffset: { width: 0, height: 0 },
+                            textShadowRadius: 6,
                           }}
                         >
                           {source.label}
@@ -2128,41 +2161,59 @@ export const MixwaveScreen: React.FC = () => {
                   />
                 </View>
               ) : (
-                <View style={{ zIndex: 2, minHeight: 200 }}>
-                  <ImageBackground
-                    source={require("../../assets/elev8ryoutubeholder-1765124402018.png")}
-                    className="flex-1"
-                    resizeMode="cover"
-                    style={{ minHeight: 200 }}
-                  >
+                <View style={{ zIndex: 2, minHeight: 220, backgroundColor: "#0a0a0a" }}>
+                  {/* Idle Audio Visualizer - Subtle ambient animation */}
+                  <AudioVisualizer
+                    mode={audioMode}
+                    audioLevel={30}
+                    isActive={true}
+                    opacity={0.25}
+                  />
+                  <View className="flex-1 items-center justify-center p-6" style={{ zIndex: 3 }}>
+                    <Text
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 20,
+                        fontWeight: "bold",
+                        letterSpacing: 6,
+                        color: modeColors.accent,
+                        textShadowColor: modeColors.glow,
+                        textShadowOffset: { width: 0, height: 0 },
+                        textShadowRadius: 15,
+                        marginBottom: 4,
+                      }}
+                    >
+                      SOUNDTRACK
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 9,
+                        letterSpacing: 4,
+                        color: modeColors.accent,
+                        opacity: 0.4,
+                        marginBottom: 20,
+                      }}
+                    >
+                      ADD YOUR VIBE
+                    </Text>
                     <View
-                      className="absolute inset-0"
-                      style={{ backgroundColor: "rgba(0,0,0,0.80)" }}
-                    />
-                    <View className="flex-1 items-center justify-center p-6">
+                      className="border border-dashed px-6 py-3 rounded-xl"
+                      style={{ borderColor: `${modeColors.accent}30` }}
+                    >
                       <Text
-                        className="text-xs font-bold text-center tracking-widest mb-2"
                         style={{
                           fontFamily: "monospace",
-                          color: "#666",
+                          fontSize: 10,
                           letterSpacing: 3,
+                          color: modeColors.accent,
                           opacity: 0.6,
                         }}
                       >
-                        NO AUDIO SOURCE
-                      </Text>
-                      <Text
-                        className="text-xs text-center"
-                        style={{
-                          fontFamily: "monospace",
-                          color: "#555",
-                          fontSize: 10,
-                        }}
-                      >
-                        Select a source above
+                        SELECT SOURCE ABOVE
                       </Text>
                     </View>
-                  </ImageBackground>
+                  </View>
                 </View>
               )}
             </View>
