@@ -413,7 +413,8 @@ export const MixwaveScreen: React.FC = () => {
       setShowMainInput(false);
       setMainUrlInput("");
       setVideoError(false); // Reset error state
-      setVideoLoading(false); // Don't show loading overlay yet
+      setVideoLoading(true); // Show loading overlay immediately when URL is submitted
+      loadingLogoOpacity.value = withTiming(1, { duration: 300 }); // Fade in the logo
       Keyboard.dismiss();
 
       // Set playing state immediately for autoplay
