@@ -1,9 +1,18 @@
 import React, { useRef, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from "react-native-reanimated";
+import { useEffect } from "react";
 import { useAppStore } from "../state/appStore";
 
 export const YouTubeViewScreen: React.FC = () => {
@@ -13,6 +22,41 @@ export const YouTubeViewScreen: React.FC = () => {
   const [canGoBack, setCanGoBack] = useState(false);
 
   const audioMode = useAppStore((s) => s.audioMode);
+
+  // Animation values for splash
+  const pulseOpacity = useSharedValue(0.6);
+  const glowScale = useSharedValue(1);
+
+  useEffect(() => {
+    // Pulse animation for logo
+    pulseOpacity.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.6, { duration: 1200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+
+    // Glow scale animation
+    glowScale.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: pulseOpacity.value,
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: glowScale.value }],
+    opacity: pulseOpacity.value * 0.5,
+  }));
 
   // Get mode colors
   const getModeColor = () => {
@@ -78,13 +122,69 @@ export const YouTubeViewScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Loading Indicator */}
+      {/* 3L3V8R Splash Screen */}
       {isLoading && (
         <View className="absolute inset-0 items-center justify-center z-10 bg-[#0E0E0E]">
-          <ActivityIndicator size="large" color={accentColor} />
-          <Text className="text-[#666666] text-xs tracking-[2px] font-mono uppercase mt-4">
-            LOADING YOUTUBE...
+          {/* Glow effect behind logo */}
+          <Animated.View
+            style={[
+              glowStyle,
+              {
+                position: "absolute",
+                width: 200,
+                height: 200,
+                borderRadius: 100,
+                backgroundColor: accentColor,
+                opacity: 0.15,
+              },
+            ]}
+          />
+
+          {/* Main Logo */}
+          <Animated.View style={pulseStyle}>
+            <Text
+              style={{
+                fontSize: 48,
+                fontWeight: "900",
+                letterSpacing: 8,
+                color: accentColor,
+                textShadowColor: accentColor,
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 20,
+              }}
+            >
+              3L3V8R
+            </Text>
+          </Animated.View>
+
+          {/* Subtitle */}
+          <Text
+            className="mt-6 tracking-[4px]"
+            style={{
+              fontFamily: "monospace",
+              fontSize: 11,
+              color: "#666",
+              textTransform: "uppercase",
+            }}
+          >
+            Loading Content
           </Text>
+
+          {/* Animated dots */}
+          <View className="flex-row mt-4" style={{ gap: 6 }}>
+            {[0, 1, 2].map((i) => (
+              <Animated.View
+                key={i}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: accentColor,
+                  opacity: 0.6,
+                }}
+              />
+            ))}
+          </View>
         </View>
       )}
 
