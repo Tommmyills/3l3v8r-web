@@ -72,7 +72,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           animatedStyle,
         ]}
       >
-        ELEVATE
+        3L3V8R
       </Animated.Text>
       <Animated.Text
         style={[
@@ -88,7 +88,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           animatedStyle,
         ]}
       >
-        YOUR LEARNING
+        ELEVATE YOUR LEARNING
       </Animated.Text>
     </View>
   );

@@ -1372,7 +1372,7 @@ export const MixwaveScreen: React.FC = () => {
                           animatedLoadingLogoStyle,
                         ]}
                       >
-                        ELEVATE
+                        3L3V8R
                       </AnimatedText>
                     </Animated.View>
                   )}
@@ -1407,7 +1407,7 @@ export const MixwaveScreen: React.FC = () => {
                         marginBottom: 8,
                       }}
                     >
-                      ELEVATE
+                      3L3V8R
                     </Text>
                     <Text
                       style={{
