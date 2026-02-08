@@ -46,7 +46,7 @@ import { useVoiceAssistStore } from "../state/voiceAssistStore";
 import { FavoritesScreen } from "./FavoritesScreen";
 import { useFavoritesStore } from "../state/favoritesStore";
 
-type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | null;
+type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | "spotify" | null;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -513,8 +513,24 @@ export const MixwaveScreen: React.FC = () => {
       isPickingAudio.current = true;
 
       const result = await DocumentPicker.getDocumentAsync({
-        type: "audio/*",
-        copyToCacheDirectory: true, // Copy to cache for better compatibility
+        type: [
+          "audio/*",
+          "audio/mpeg",
+          "audio/mp3",
+          "audio/wav",
+          "audio/aac",
+          "audio/m4a",
+          "audio/x-m4a",
+          "audio/ogg",
+          "audio/flac",
+          ".mp3",
+          ".wav",
+          ".m4a",
+          ".aac",
+          ".ogg",
+          ".flac",
+        ],
+        copyToCacheDirectory: true,
         multiple: false,
       });
 
@@ -823,6 +839,8 @@ export const MixwaveScreen: React.FC = () => {
         return "https://music.apple.com";
       case "soundcloud":
         return "https://soundcloud.com";
+      case "spotify":
+        return "https://open.spotify.com";
       default:
         return "";
     }
@@ -1999,7 +2017,8 @@ export const MixwaveScreen: React.FC = () => {
                       { id: "bandcamp", label: "BANDCAMP", icon: "radio", color: "#1DA0C3" },
                       { id: "mixcloud", label: "MIXCLOUD", icon: "cloud", color: "#FF7F00" },
                       { id: "soundcloud", label: "SOUNDCLOUD", icon: "cloud-outline", color: "#FF5500" },
-                      { id: "apple-music", label: "APPLE", icon: "logo-apple", color: "#FC3C44" },
+                      { id: "spotify", label: "SPOTIFY", icon: "musical-note", color: "#1DB954" },
+                      { id: "apple-music", label: "APPLE MUSIC", icon: "logo-apple", color: "#FC3C44" },
                     ].map((source) => (
                       <Pressable
                         key={source.id}
@@ -2152,7 +2171,7 @@ export const MixwaveScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
-              ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "soundcloud" ? (
+              ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "soundcloud" || musicSource === "spotify" ? (
                 <View style={{ height: 200, zIndex: 2 }}>
                   <WebView
                     ref={musicWebViewRef}
