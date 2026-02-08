@@ -679,4 +679,35 @@ All text uses **monospace** font with increased letter spacing:
 
 ---
 
+## Vercel Deployment
+
+When deploying to Vercel (Expo Web), you need to add the following environment variables in your Vercel project settings:
+
+### Required Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `EXPO_PUBLIC_YouTube_Transcriber_API_Key` | YouTube Transcript API key for video transcription |
+| `EXPO_PUBLIC_VIBECODE_OPENAI_API_KEY` | OpenAI API key for AI features (summarization, Q&A, notes) |
+| `EXPO_PUBLIC_VIBECODE_ELEVENLABS_API_KEY` | ElevenLabs API key (optional, for voice features) |
+| `EXPO_PUBLIC_VIBECODE_ANTHROPIC_API_KEY` | Anthropic API key (optional) |
+| `EXPO_PUBLIC_VIBECODE_GROK_API_KEY` | Grok API key (optional) |
+| `EXPO_PUBLIC_VIBECODE_GOOGLE_API_KEY` | Google API key (optional) |
+
+### Web-Specific Features
+
+The app includes web-compatible versions of certain components:
+- **SplashScreen.web.tsx** - CSS-based animations for the 3L3V8R logo splash
+- **AudioVisualizer.web.tsx** - CSS keyframe animations for sound wave visualization
+
+These `.web.tsx` files are automatically used by Expo when building for web.
+
+### Known Web Limitations
+
+1. **WebView Embeds** - Bandcamp, Mixcloud, and Apple Music use iframe-based WebViews via `react-native-web-webview`
+2. **Audio Playback** - Local MP3 playback uses `expo-av` which has partial web support
+3. **Animations** - Some `react-native-reanimated` animations are simplified on web
+
+---
+
 **TE-001 FIRMWARE Rev. 3L3V8R 2025-ALPHA ENGINE**

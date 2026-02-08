@@ -12,6 +12,7 @@
     "node_modules",
     "backend/node_modules",
     "backend/generated",
-    ".expo"
+    ".expo",
+    "3l3v8r-web"
   ]
 }
