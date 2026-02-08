@@ -9,7 +9,7 @@ export interface SavedMix {
   timestamp: number;
   mainVideoUrl: string;
   mainVideoId: string;
-  musicSource: "local" | "bandcamp" | "mixcloud" | "apple-music" | null;
+  musicSource: "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | null;
   channelAGain: number;
   channelBGain: number;
   audioMode: string;

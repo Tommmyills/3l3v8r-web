@@ -103,6 +103,7 @@ Choose from multiple audio sources:
 - **LOCAL MP3** - Play audio files from your device
 - **BANDCAMP** - Stream from Bandcamp
 - **MIXCLOUD** - Listen to DJ sets and podcasts
+- **SOUNDCLOUD** - Stream from SoundCloud
 - **APPLE MUSIC** - Access Apple Music (subscription required)
 - **External Gain Control (0-100)** - Independent mixing control
 - **Auto-Duck indicator** - Shows [DUCK] when Channel B is being lowered
@@ -667,6 +668,7 @@ The app uses Zustand with the following state:
 ### Platform Colors
 - **Bandcamp**: #1DA0C3
 - **Mixcloud**: #FF7F00
+- **SoundCloud**: #FF5500
 - **Apple Music**: #FC3C44
 
 ## Typography

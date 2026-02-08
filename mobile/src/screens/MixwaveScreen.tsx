@@ -46,7 +46,7 @@ import { useVoiceAssistStore } from "../state/voiceAssistStore";
 import { FavoritesScreen } from "./FavoritesScreen";
 import { useFavoritesStore } from "../state/favoritesStore";
 
-type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | null;
+type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | null;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedText = Animated.createAnimatedComponent(Text);
@@ -821,6 +821,8 @@ export const MixwaveScreen: React.FC = () => {
         return "https://mixcloud.com";
       case "apple-music":
         return "https://music.apple.com";
+      case "soundcloud":
+        return "https://soundcloud.com";
       default:
         return "";
     }
@@ -1996,6 +1998,7 @@ export const MixwaveScreen: React.FC = () => {
                       { id: "local", label: "LOCAL MP3", icon: "musical-notes", color: modeColors.accent },
                       { id: "bandcamp", label: "BANDCAMP", icon: "radio", color: "#1DA0C3" },
                       { id: "mixcloud", label: "MIXCLOUD", icon: "cloud", color: "#FF7F00" },
+                      { id: "soundcloud", label: "SOUNDCLOUD", icon: "cloud-outline", color: "#FF5500" },
                       { id: "apple-music", label: "APPLE", icon: "logo-apple", color: "#FC3C44" },
                     ].map((source) => (
                       <Pressable
@@ -2149,7 +2152,7 @@ export const MixwaveScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
-              ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" ? (
+              ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "soundcloud" ? (
                 <View style={{ height: 200, zIndex: 2 }}>
                   <WebView
                     ref={musicWebViewRef}
