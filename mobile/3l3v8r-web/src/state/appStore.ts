@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type AudioMode = 'FOCUS' | 'STUDY' | 'CHILL' | 'FLOW' | 'DEEP'
 
-export type MusicSource = 'local' | 'bandcamp' | 'mixcloud' | 'apple-music'
+export type MusicSource = 'local' | 'bandcamp' | 'mixcloud' | 'apple-music' | 'soundcloud' | 'spotify'
 
 export interface SessionNote {
   id: string

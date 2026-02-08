@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Music, Play, Pause, Volume2, VolumeX, X } from 'lucide-react'
 import { useAppStore, type AudioMode, type MusicSource } from '../state/appStore'
 
@@ -10,11 +10,13 @@ const MODE_COLORS: Record<AudioMode, string> = {
   DEEP: '#EF4444',
 }
 
-const SOURCE_LABELS: Record<MusicSource, string> = {
-  local: 'LOCAL MP3',
-  bandcamp: 'BANDCAMP',
-  mixcloud: 'MIXCLOUD',
-  'apple-music': 'APPLE MUSIC',
+const SOURCE_CONFIG: Record<MusicSource, { label: string; color: string; url: string }> = {
+  local: { label: 'LOCAL MP3', color: '#FF7A00', url: '' },
+  bandcamp: { label: 'BANDCAMP', color: '#1DA0C3', url: 'https://bandcamp.com' },
+  mixcloud: { label: 'MIXCLOUD', color: '#FF7F00', url: 'https://mixcloud.com' },
+  soundcloud: { label: 'SOUNDCLOUD', color: '#FF5500', url: 'https://soundcloud.com' },
+  spotify: { label: 'SPOTIFY', color: '#1DB954', url: 'https://open.spotify.com' },
+  'apple-music': { label: 'APPLE MUSIC', color: '#FC3C44', url: 'https://music.apple.com' },
 }
 
 export function ChannelB() {
@@ -33,7 +35,7 @@ export function ChannelB() {
 
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -44,7 +46,7 @@ export function ChannelB() {
 
       const audio = new Audio(url)
       audio.volume = musicVideo.volume / 100
-      setAudioElement(audio)
+      audioRef.current = audio
 
       audio.play()
       setMusicVideoPlaying(true)
@@ -52,47 +54,47 @@ export function ChannelB() {
   }
 
   const togglePlay = () => {
-    if (!audioElement) return
+    if (!audioRef.current) return
     if (musicVideo.isPlaying) {
-      audioElement.pause()
+      audioRef.current.pause()
       setMusicVideoPlaying(false)
     } else {
-      audioElement.play()
+      audioRef.current.play()
       setMusicVideoPlaying(true)
     }
   }
 
   const toggleMute = () => {
-    if (!audioElement) return
-    audioElement.muted = !musicVideo.isMuted
+    if (!audioRef.current) return
+    audioRef.current.muted = !musicVideo.isMuted
     setMusicVideoMuted(!musicVideo.isMuted)
   }
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseInt(e.target.value, 10)
     setMusicVideoVolume(vol)
-    if (audioElement) {
-      // Apply auto-duck reduction if speech detected
+    if (audioRef.current) {
       const effectiveVolume = autoDuckEnabled && isSpeechDetected ? vol * 0.6 : vol
-      audioElement.volume = effectiveVolume / 100
+      audioRef.current.volume = effectiveVolume / 100
     }
   }
 
   const handleClear = () => {
-    if (audioElement) {
-      audioElement.pause()
-      audioElement.src = ''
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.src = ''
     }
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl)
     }
     setAudioFile(null)
     setAudioUrl(null)
-    setAudioElement(null)
+    audioRef.current = null
     clearMusicVideo()
+    setMusicSource('local')
   }
 
-  const sources: MusicSource[] = ['local', 'bandcamp', 'mixcloud', 'apple-music']
+  const sources: MusicSource[] = ['local', 'bandcamp', 'soundcloud', 'mixcloud', 'spotify', 'apple-music']
 
   return (
     <section className="mb-6">
@@ -104,36 +106,49 @@ export function ChannelB() {
             <span className="ml-2 text-orange-500">[DUCK]</span>
           )}
         </h2>
+        {musicSource !== 'local' && (
+          <button
+            onClick={handleClear}
+            className="p-1 text-te-text-tertiary hover:text-red-500 transition-colors btn-press"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
 
       {/* Source Selector */}
-      <div className="flex gap-2 mb-4 overflow-x-auto hide-scrollbar">
+      <div className="flex gap-2 mb-4 overflow-x-auto hide-scrollbar pb-2">
         {sources.map((source) => {
           const isActive = musicSource === source
+          const config = SOURCE_CONFIG[source]
+          const color = source === 'local' ? accentColor : config.color
+
           return (
             <button
               key={source}
               onClick={() => setMusicSource(source)}
-              className={`px-3 py-1.5 text-xs tracking-te-wide whitespace-nowrap rounded border transition-colors btn-press ${
+              className={`px-3 py-1.5 text-xs tracking-te-wide whitespace-nowrap rounded border transition-all btn-press ${
                 isActive
                   ? 'border-transparent'
                   : 'border-te-border text-te-text-secondary hover:text-te-text'
               }`}
               style={{
-                backgroundColor: isActive ? accentColor : 'transparent',
-                color: isActive ? '#0E0E0E' : undefined,
+                backgroundColor: isActive ? color : 'transparent',
+                color: isActive ? '#0E0E0E' : color,
+                borderColor: isActive ? color : undefined,
+                boxShadow: isActive ? `0 0 12px ${color}40` : 'none',
               }}
             >
-              {SOURCE_LABELS[source]}
+              {config.label}
             </button>
           )
         })}
       </div>
 
       {/* Player Panel */}
-      <div className="p-4 bg-te-panel border border-te-border rounded">
+      <div className="bg-te-panel border border-te-border rounded overflow-hidden">
         {musicSource === 'local' ? (
-          <>
+          <div className="p-4">
             {audioFile ? (
               <div className="space-y-3">
                 {/* File Info */}
@@ -187,22 +202,23 @@ export function ChannelB() {
                 <span className="mt-2 text-sm tracking-te-wide">SELECT MP3</span>
                 <input
                   type="file"
-                  accept="audio/*"
+                  accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
               </label>
             )}
-          </>
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-te-text-secondary">
-            <Music size={32} strokeWidth={1} />
-            <span className="mt-2 text-sm tracking-te-wide">
-              {SOURCE_LABELS[musicSource]} - Coming Soon
-            </span>
-            <p className="mt-1 text-xs text-te-text-tertiary">
-              Web embeds for streaming services will be added
-            </p>
+          /* Streaming Service Embed */
+          <div className="relative" style={{ height: '300px' }}>
+            <iframe
+              src={SOURCE_CONFIG[musicSource].url}
+              className="w-full h-full border-0"
+              allow="autoplay; encrypted-media; fullscreen"
+              sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-presentation"
+              title={SOURCE_CONFIG[musicSource].label}
+            />
           </div>
         )}
       </div>
