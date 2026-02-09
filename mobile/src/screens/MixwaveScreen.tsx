@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   ImageBackground,
   Alert,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
@@ -503,6 +504,15 @@ export const MixwaveScreen: React.FC = () => {
   const isPickingAudio = useRef(false); // Prevent multiple simultaneous picker calls
 
   const handlePickLocalMusic = async () => {
+    // Web platform - show message
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "MP3 Player",
+        "Local file playback is available on the iOS app. Download 3L3V8R on the App Store for full features."
+      );
+      return;
+    }
+
     // Prevent multiple simultaneous picker calls
     if (isPickingAudio.current) {
       console.log("Document picker already open, ignoring request");
@@ -2173,15 +2183,43 @@ export const MixwaveScreen: React.FC = () => {
                 </View>
               ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "soundcloud" || musicSource === "spotify" ? (
                 <View style={{ height: 200, zIndex: 2 }}>
-                  <WebView
-                    ref={musicWebViewRef}
-                    source={{ uri: getMusicSourceUrl() }}
-                    allowsInlineMediaPlayback
-                    mediaPlaybackRequiresUserAction={false}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    style={{ flex: 1 }}
-                  />
+                  {Platform.OS === "web" ? (
+                    <View className="flex-1 items-center justify-center p-6" style={{ backgroundColor: "#0a0a0a" }}>
+                      <Text
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: 14,
+                          letterSpacing: 2,
+                          color: modeColors.accent,
+                          textAlign: "center",
+                          marginBottom: 8,
+                        }}
+                      >
+                        {musicSource?.toUpperCase().replace("-", " ")}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: "monospace",
+                          fontSize: 10,
+                          letterSpacing: 1,
+                          color: "#666",
+                          textAlign: "center",
+                        }}
+                      >
+                        Available on iOS App
+                      </Text>
+                    </View>
+                  ) : (
+                    <WebView
+                      ref={musicWebViewRef}
+                      source={{ uri: getMusicSourceUrl() }}
+                      allowsInlineMediaPlayback
+                      mediaPlaybackRequiresUserAction={false}
+                      javaScriptEnabled
+                      domStorageEnabled
+                      style={{ flex: 1 }}
+                    />
+                  )}
                 </View>
               ) : (
                 <View style={{ zIndex: 2, minHeight: 220, backgroundColor: "#0a0a0a" }}>
