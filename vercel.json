@@ -1,6 +1,15 @@
 {
-  "buildCommand": null,
-  "outputDirectory": "mobile/dist",
-  "installCommand": null,
-  "framework": null
+  "version": 2,
+  "builds": [
+    {
+      "src": "mobile/dist/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/mobile/dist/$1"
+    }
+  ]
 }
