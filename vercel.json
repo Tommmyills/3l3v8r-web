@@ -1,9 +1,6 @@
 {
-  "buildCommand": "cd mobile && npm install --legacy-peer-deps && npx expo export --platform web",
+  "buildCommand": null,
   "outputDirectory": "mobile/dist",
-  "installCommand": "npm install -g npm@latest && cd mobile && npm install --legacy-peer-deps",
-  "framework": null,
-  "env": {
-    "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
-  }
+  "installCommand": null,
+  "framework": null
 }
