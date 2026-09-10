@@ -1,7 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "buildCommand": "",
-  "installCommand": "",
+  "buildCommand": "cd mobile && bunx expo export --platform web --output-dir dist",
+  "installCommand": "cd mobile && bun install --frozen-lockfile",
+  "bunVersion": "1.x",
   "framework": null,
-  "outputDirectory": "."
+  "outputDirectory": "mobile/dist"
 }
