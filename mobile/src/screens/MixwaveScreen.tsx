@@ -1331,14 +1331,22 @@ export const MixwaveScreen: React.FC = () => {
                         style={[
                           {
                             fontFamily: "monospace",
-                            fontSize: 38,
+                            fontSize: 50,
                             fontWeight: "bold",
                             letterSpacing: 8,
-                            color: modeColors.accent,
-                            textShadowColor: modeColors.glow,
+                            color: "#FF9A5A",
+                            textShadowColor: "rgba(95,212,244,0.25)",
                             textShadowOffset: { width: 0, height: 0 },
-                            textShadowRadius: 30,
+                            textShadowRadius: 12,
                           },
+                          Platform.OS === "web"
+                            ? ({
+                                backgroundImage: "linear-gradient(90deg, #5FD4F4 0%, #FF9A5A 100%)",
+                                backgroundClip: "text",
+                                WebkitBackgroundClip: "text",
+                                WebkitTextFillColor: "transparent",
+                              } as any)
+                            : null,
                           animatedLoadingLogoStyle,
                         ]}
                       >
@@ -1368,22 +1376,21 @@ export const MixwaveScreen: React.FC = () => {
                       style={[
                         {
                           fontFamily: "monospace",
-                          fontSize: 76,
-                          fontWeight: "900",
-                          letterSpacing: 5,
-                          color: "#101214",
-                          textShadowColor: "rgba(210,220,230,0.12)",
-                          textShadowOffset: { width: -1, height: -1 },
-                          textShadowRadius: 1,
+                          fontSize: 48,
+                          fontWeight: "bold",
+                          letterSpacing: 8,
+                          color: "#FF9A5A",
+                          textShadowColor: "rgba(95,212,244,0.25)",
+                          textShadowOffset: { width: 0, height: 0 },
+                          textShadowRadius: 12,
                           marginBottom: 30,
                         },
                         Platform.OS === "web"
                           ? ({
-                              backgroundImage: "linear-gradient(165deg, #25292d 0%, #0b0d0f 38%, #16191c 56%, #050607 100%)",
+                              backgroundImage: "linear-gradient(90deg, #5FD4F4 0%, #FF9A5A 100%)",
                               backgroundClip: "text",
                               WebkitBackgroundClip: "text",
                               WebkitTextFillColor: "transparent",
-                              filter: "drop-shadow(0 8px 9px rgba(0,0,0,0.95))",
                             } as any)
                           : null,
                       ]}
