@@ -511,7 +511,6 @@ Quick access to your saved videos without searching again:
 │   ├── utils/
 │   │   ├── audioMixer.ts           # External audio mixer engine
 │   │   ├── speechDetector.ts      # Speech detection for auto-duck
-│   │   ├── youtubeVolumeController.ts  # YouTube volume sync controller
 │   │   └── translator.ts           # Google Translate API integration
 │   └── ...
 ├── assets/                          # App assets
@@ -524,13 +523,15 @@ Quick access to your saved videos without searching again:
 
 **Challenge:** React Native WebViews don't expose audio streams to Web Audio API, preventing direct MediaElementSourceNode creation from YouTube iframes.
 
-**Solution:** Hybrid approach using YouTube IFrame API for Channel A control:
-- **Channel A (YouTube):** Uses YouTube's native `setVolume()` API with 100ms sync intervals
-- **Channel B (Local Audio):** Direct Expo Audio API control with true gain nodes
-- **External Mixer:** Calculates gain values and coordinates both channels
-- **Auto-Duck:** Monitors Channel A activity, smoothly adjusts Channel B (150ms attack, 800ms release)
+Each channel controls its own player; no media streams are extracted or mixed through shared gain nodes.
 
-Both channels appear unified to the user, with the mixer handling synchronization and ducking logic.
+- **Channel A:** `TutorialPlayer.web.tsx` owns the visible `YT.Player` iframe on web. Native retains `react-native-youtube-iframe` and its internal WebView reference. Volume updates are event-driven.
+- **Channel B, local files:** Expo DocumentPicker supplies a local URI (a managed blob URL on web) to one Expo AV `Audio.Sound`. One effect applies music volume; clearing or replacing the source unloads the sound.
+- **Channel B, SoundCloud:** The official widget inside the existing music panel receives `SC.Widget.setVolume()` commands. Paste a full HTTPS track or playlist URL, then use the widget play button or the music playback control. For a private playlist, paste its SoundCloud Share → Embed code into the same input; the app extracts the official widget URL and preserves its secret token. This keeps the playlist private but grants access to anyone holding the code. Account login/library browsing is not implemented.
+- **Auto-duck:** Off by default for independent playback. When explicitly enabled, music plays at 60% of its selected level while the tutorial is playing and audible. This is playback-state ducking, not speech detection.
+- **Web compatibility:** A range-input adapter replaces the installed slider's removed React 19 API. Babel transforms `import.meta` for reproducible Expo SDK 53 exports.
+
+See `../AUDIO_REPAIR.md` for history, verification results, and remaining listening checks.
 
 ## State Management
 

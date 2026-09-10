@@ -12,10 +12,13 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import YoutubePlayer, { YoutubeIframeRef } from "react-native-youtube-iframe";
+import type { YoutubeIframeRef } from "react-native-youtube-iframe";
+import YoutubePlayer from "../components/TutorialPlayer";
+import { SoundCloudPlayer, SoundCloudPlayerRef } from "../components/SoundCloudPlayer";
+import { resolveSoundCloudInput } from "../utils/soundCloudWidget";
 import { WebView } from "react-native-webview";
-import Slider from "@react-native-community/slider";
-import { Audio } from "expo-av";
+import Slider from "../components/PlaybackSlider";
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from "expo-av";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import { useAppStore, AudioMode } from "../state/appStore";
@@ -30,8 +33,6 @@ import Animated, {
   FadeIn,
   FadeOut,
 } from "react-native-reanimated";
-import { audioMixer } from "../utils/audioMixer";
-import { speechDetector } from "../utils/speechDetector";
 import { SettingsScreen } from "./SettingsScreen";
 import { NotesScreen } from "./NotesScreen";
 import { ProfileScreen } from "./ProfileScreen";
@@ -147,8 +148,15 @@ export const MixwaveScreen: React.FC = () => {
 
   // Player refs
   const mainPlayerRef = useRef<YoutubeIframeRef>(null);
-  const mainWebViewRef = useRef<WebView>(null);
   const musicWebViewRef = useRef<WebView>(null);
+  const soundCloudRef = useRef<SoundCloudPlayerRef>(null);
+  const [soundCloudInput, setSoundCloudInput] = useState("");
+  const [soundCloudUrl, setSoundCloudUrl] = useState("");
+  const [soundCloudLoading, setSoundCloudLoading] = useState(false);
+  const soundCloudLoad = useRef<AbortController | null>(null);
+  const [musicError, setMusicError] = useState("");
+  const audioGeneration = useRef(0);
+  const audioObjectUrl = useRef<string | null>(null);
 
   // Track playing states locally
   const [mainPlaying, setMainPlaying] = useState(false);
@@ -190,21 +198,28 @@ export const MixwaveScreen: React.FC = () => {
   const borderGlow = useSharedValue(0);
 
   // Mixer state
-  const [channelAGain, setChannelAGain] = useState(70); // 0-100
-  const [channelBGain, setChannelBGain] = useState(70); // 0-100
-  const [autoDuckEnabled, setAutoDuckEnabled] = useState(true);
-  const [isDucking, setIsDucking] = useState(false);
-  const [speechActive, setSpeechActive] = useState(false);
+  const channelAGain = mainVideo.volume;
+  const channelBGain = musicVideo.volume;
+  const [autoDuckEnabled, setAutoDuckEnabled] = useState(false);
+  const speechActive = mainPlaying && !mainVideo.isMuted && channelAGain > 0;
+  const isDucking = autoDuckEnabled && speechActive;
+  const musicVolume = musicVideo.isMuted ? 0 : channelBGain * (isDucking ? 0.6 : 1);
+  const musicVolumeRef = useRef(musicVolume);
+  musicVolumeRef.current = musicVolume;
 
   // Get current mode colors
   const modeColors = getModeColors(audioMode);
 
   const setupAudio = async () => {
+    if (Platform.OS === "web") return;
     try {
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
+        staysActiveInBackground: false,
+        allowsRecordingIOS: false,
+        interruptionModeIOS: InterruptionModeIOS.MixWithOthers,
+        interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+        shouldDuckAndroid: false,
       });
     } catch (error) {
       console.log("Audio setup error:", error);
@@ -212,9 +227,17 @@ export const MixwaveScreen: React.FC = () => {
   };
 
   const cleanupAudio = async () => {
-    if (audioRef.current) {
-      await audioRef.current.unloadAsync();
-      audioRef.current = null;
+    soundCloudLoad.current?.abort();
+    soundCloudLoad.current = null;
+    audioGeneration.current += 1;
+    const sound = audioRef.current;
+    const objectUrl = audioObjectUrl.current;
+    audioRef.current = null;
+    audioObjectUrl.current = null;
+    try {
+      if (sound) await sound.unloadAsync();
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     }
   };
 
@@ -286,23 +309,6 @@ export const MixwaveScreen: React.FC = () => {
   useEffect(() => {
     setupAudio();
 
-    // Initialize audio mixer
-    audioMixer.updateState({
-      channelAGain: channelAGain / 100,
-      channelBGain: channelBGain / 100,
-      autoDuckEnabled,
-    });
-
-    // Setup speech detector callback
-    speechDetector.setOnSpeechChange((isActive) => {
-      setSpeechActive(isActive);
-      audioMixer.processChannelA(isActive);
-      setIsDucking(audioMixer.getIsDucking());
-    });
-
-    // Start speech detection monitoring
-    speechDetector.start(100);
-
     // Start smooth looping logo glow animation (6 second cycle - slower, breathing)
     logoGlow.value = withRepeat(
       withTiming(1, {
@@ -336,8 +342,6 @@ export const MixwaveScreen: React.FC = () => {
     return () => {
       cleanupAudio();
       stopYoutubeProgressTracking();
-      speechDetector.destroy();
-      audioMixer.destroy();
     };
   }, [stopYoutubeProgressTracking]);
 
@@ -504,15 +508,6 @@ export const MixwaveScreen: React.FC = () => {
   const isPickingAudio = useRef(false); // Prevent multiple simultaneous picker calls
 
   const handlePickLocalMusic = async () => {
-    // Web platform - show message
-    if (Platform.OS === "web") {
-      Alert.alert(
-        "MP3 Player",
-        "Local file playback is available on the iOS app. Download 3L3V8R on the App Store for full features."
-      );
-      return;
-    }
-
     // Prevent multiple simultaneous picker calls
     if (isPickingAudio.current) {
       console.log("Document picker already open, ignoring request");
@@ -521,71 +516,47 @@ export const MixwaveScreen: React.FC = () => {
 
     try {
       isPickingAudio.current = true;
+      const selectionGeneration = audioGeneration.current;
+      setMusicError("");
 
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          "audio/*",
-          "audio/mpeg",
-          "audio/mp3",
-          "audio/wav",
-          "audio/aac",
-          "audio/m4a",
-          "audio/x-m4a",
-          "audio/ogg",
-          "audio/flac",
-          ".mp3",
-          ".wav",
-          ".m4a",
-          ".aac",
-          ".ogg",
-          ".flac",
-        ],
+        type: "audio/*",
         copyToCacheDirectory: true,
+        base64: false,
         multiple: false,
       });
 
       if (result.canceled === false && result.assets && result.assets[0]) {
+        if (selectionGeneration !== audioGeneration.current) return;
         const file = result.assets[0];
 
         console.log("Selected audio file:", file.name, "URI:", file.uri, "Size:", file.size);
 
-        if (audioRef.current) {
-          try {
-            await audioRef.current.unloadAsync();
-          } catch (e) {
-            console.log("Error unloading previous audio:", e);
-          }
-          audioRef.current = null;
-        }
-
-        // Reset audio mode and configure for maximum compatibility
-        try {
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false, // Changed for better compatibility
-            shouldDuckAndroid: false, // Changed for better compatibility
-            allowsRecordingIOS: false,
-            interruptionModeIOS: 2, // Mix with other audio for better compatibility
-          });
-        } catch (audioModeError) {
-          console.log("Audio mode setup warning:", audioModeError);
-          // Continue even if audio mode fails
-        }
+        await cleanupAudio();
+        const generation = selectionGeneration + 1;
+        if (generation !== audioGeneration.current) return;
+        setCurrentTrack("");
+        setIsPlaying(false);
+        setAudioDuration(0);
+        setAudioCurrentTime(0);
+        const objectUrl = Platform.OS === "web" && file.file ? URL.createObjectURL(file.file) : null;
+        audioObjectUrl.current = objectUrl;
 
         // Load audio with more permissive settings
         console.log("Loading audio file...");
         const { sound } = await Audio.Sound.createAsync(
-          { uri: file.uri },
+          { uri: objectUrl ?? file.uri },
           {
             shouldPlay: false,
-            volume: musicVideo.volume / 100,
+            volume: musicVolumeRef.current / 100,
             progressUpdateIntervalMillis: 1000, // Less frequent updates for large files
             isLooping: false,
             androidImplementation: "MediaPlayer", // Use Android MediaPlayer for better format support
           },
           (status) => {
-            // Playback status update callback
+            if (generation !== audioGeneration.current) return;
             if (status.isLoaded) {
+              if (status.durationMillis) setAudioDuration(status.durationMillis / 1000);
               if (status.positionMillis !== undefined) {
                 setAudioCurrentTime(status.positionMillis / 1000);
               }
@@ -599,8 +570,13 @@ export const MixwaveScreen: React.FC = () => {
           }
         );
 
-        console.log("Audio loaded successfully");
+        if (generation !== audioGeneration.current) {
+          await sound.unloadAsync();
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          return;
+        }
         audioRef.current = sound;
+        await sound.setVolumeAsync(musicVolumeRef.current / 100);
         setCurrentTrack(file.name);
 
         // Get duration with error handling
@@ -618,8 +594,10 @@ export const MixwaveScreen: React.FC = () => {
           setAudioDuration(3600);
         }
 
-        // Now play the audio
+        if (generation !== audioGeneration.current) return;
+        // Browsers may require a second tap after the asynchronous file picker.
         await sound.playAsync();
+        if (generation !== audioGeneration.current) return;
         setIsPlaying(true);
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -643,7 +621,8 @@ export const MixwaveScreen: React.FC = () => {
         userMessage = "The audio file could not be decoded. The file may be using an unsupported codec or bitrate. Try converting to a standard MP3 format.";
       }
 
-      Alert.alert("Audio Load Error", userMessage);
+      setMusicError(userMessage);
+      if (!audioRef.current) await cleanupAudio();
     } finally {
       // Always reset the picker flag
       isPickingAudio.current = false;
@@ -660,6 +639,10 @@ export const MixwaveScreen: React.FC = () => {
 
   // Toggle playback for local files
   const togglePlayback = async () => {
+    if (musicSource === "soundcloud") {
+      soundCloudRef.current?.toggle();
+      return;
+    }
     if (audioRef.current) {
       const status = await audioRef.current.getStatusAsync();
       if (status.isLoaded) {
@@ -678,12 +661,13 @@ export const MixwaveScreen: React.FC = () => {
   // Clear music source
   const clearMusicSource = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (musicSource === "local" && audioRef.current) {
-      await audioRef.current.unloadAsync();
-      audioRef.current = null;
-      setCurrentTrack("");
-      setIsPlaying(false);
-    }
+    await cleanupAudio();
+    setCurrentTrack("");
+    setIsPlaying(false);
+    setMusicError("");
+    setSoundCloudUrl("");
+    setSoundCloudLoading(false);
+    setSoundCloudInput("");
     setMusicSource(null);
     clearMusicVideo();
   };
@@ -751,60 +735,14 @@ export const MixwaveScreen: React.FC = () => {
     });
   };
 
-  // Update volume for local audio
+  // One writer for Channel B; Channel A has no access to this sound.
   useEffect(() => {
     if (audioRef.current && musicSource === "local") {
-      audioRef.current.setVolumeAsync(musicVideo.volume / 100);
+      audioRef.current.setVolumeAsync(musicVolume / 100).catch(() => {
+        setMusicError("Could not update music volume. Reload the local file.");
+      });
     }
-  }, [musicVideo.volume, musicSource]);
-
-  // Monitor speech activity for auto-duck
-  useEffect(() => {
-    if (!mainVideo.videoId) return;
-
-    // Monitor speech activity
-    const speechCheckInterval = setInterval(() => {
-      if (mainPlaying && !mainVideo.isMuted && channelAGain > 0) {
-        // If video is playing and not muted, assume speech is present
-        speechDetector.processAudioLevel(-35, true);
-      } else {
-        speechDetector.processAudioLevel(-60, false);
-      }
-    }, 100);
-
-    return () => {
-      clearInterval(speechCheckInterval);
-    };
-  }, [mainVideo.videoId, mainVideo.isMuted, mainPlaying, channelAGain]);
-
-  // Update mixer when gains change
-  useEffect(() => {
-    audioMixer.updateState({
-      channelAGain: channelAGain / 100,
-    });
-  }, [channelAGain]);
-
-  // Update mixer for Channel B
-  useEffect(() => {
-    audioMixer.updateState({
-      channelBGain: channelBGain / 100,
-    });
-    // Update duck state
-    setIsDucking(audioMixer.getIsDucking());
-  }, [channelBGain]);
-
-  // Update local audio volume with mixer gain
-  useEffect(() => {
-    if (audioRef.current && musicSource === "local") {
-      const effectiveGain = audioMixer.getChannelBGain();
-      audioRef.current.setVolumeAsync(effectiveGain);
-    }
-    // Check ducking state periodically
-    const checkDuck = setInterval(() => {
-      setIsDucking(audioMixer.getIsDucking());
-    }, 100);
-    return () => clearInterval(checkDuck);
-  }, [channelBGain, musicSource]);
+  }, [musicVolume, musicSource]);
 
   // Pulsing glow animation for loading logo
   useEffect(() => {
@@ -1260,7 +1198,9 @@ export const MixwaveScreen: React.FC = () => {
                     height={320}
                     play={mainPlaying}
                     videoId={mainVideo.videoId}
-                    volume={mainVideo.isMuted ? 0 : channelAGain}
+                    volume={channelAGain}
+                    mute={mainVideo.isMuted}
+                    playbackRate={playbackSpeed}
                     onChangeState={onMainStateChange}
                     onReady={() => {
                       console.log("YouTube player onReady - attempting to play");
@@ -1289,7 +1229,6 @@ export const MixwaveScreen: React.FC = () => {
                     }}
                     forceAndroidAutoplay={true}
                     webViewProps={{
-                      ref: mainWebViewRef,
                       allowsInlineMediaPlayback: true,
                       mediaPlaybackRequiresUserAction: false,
                       javaScriptEnabled: true,
@@ -1426,32 +1365,30 @@ export const MixwaveScreen: React.FC = () => {
                     className="flex-1 items-center justify-center"
                   >
                     <Text
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 36,
-                        fontWeight: "bold",
-                        letterSpacing: 8,
-                        color: modeColors.accent,
-                        textShadowColor: modeColors.glow,
-                        textShadowOffset: { width: 0, height: 0 },
-                        textShadowRadius: 25,
-                        marginBottom: 8,
-                      }}
+                      style={[
+                        {
+                          fontFamily: "monospace",
+                          fontSize: 76,
+                          fontWeight: "900",
+                          letterSpacing: 5,
+                          color: "#101214",
+                          textShadowColor: "rgba(210,220,230,0.12)",
+                          textShadowOffset: { width: -1, height: -1 },
+                          textShadowRadius: 1,
+                          marginBottom: 30,
+                        },
+                        Platform.OS === "web"
+                          ? ({
+                              backgroundImage: "linear-gradient(165deg, #25292d 0%, #0b0d0f 38%, #16191c 56%, #050607 100%)",
+                              backgroundClip: "text",
+                              WebkitBackgroundClip: "text",
+                              WebkitTextFillColor: "transparent",
+                              filter: "drop-shadow(0 8px 9px rgba(0,0,0,0.95))",
+                            } as any)
+                          : null,
+                      ]}
                     >
                       3L3V8R
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 10,
-                        fontWeight: "500",
-                        letterSpacing: 4,
-                        color: modeColors.accent,
-                        opacity: 0.5,
-                        marginBottom: 24,
-                      }}
-                    >
-                      YOUR LEARNING
                     </Text>
                     <View className="border border-dashed px-8 py-4 rounded-xl" style={{ borderColor: `${modeColors.accent}40` }}>
                       <Text
@@ -1557,9 +1494,9 @@ export const MixwaveScreen: React.FC = () => {
                       minimumValue={0}
                       maximumValue={100}
                       step={1}
+                      accessibilityLabel="Tutorial volume"
                       value={channelAGain}
                       onValueChange={(value) => {
-                        setChannelAGain(value);
                         setMainVideoVolume(value);
                       }}
                       onTouchStart={() => {
@@ -2032,8 +1969,12 @@ export const MixwaveScreen: React.FC = () => {
                     ].map((source) => (
                       <Pressable
                         key={source.id}
-                        onPress={() => {
-                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        onPress={async () => {
+                          if (source.id === musicSource) return;
+                          await cleanupAudio();
+                          setCurrentTrack("");
+                          setIsPlaying(false);
+                          setMusicError("");
                           setMusicSource(source.id as MusicSource);
                         }}
                         className="border px-4 py-3 rounded-2xl flex-row items-center"
@@ -2181,7 +2122,44 @@ export const MixwaveScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
-              ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "soundcloud" || musicSource === "spotify" ? (
+              ) : musicSource === "soundcloud" ? (
+                <View style={{ height: 260, zIndex: 2 }}>
+                  <View className="flex-row items-center px-3 py-2" style={{ gap: 8 }}>
+                    <TextInput value={soundCloudInput} onChangeText={setSoundCloudInput}
+                      placeholder="SoundCloud link or private embed code" placeholderTextColor="#777"
+                      accessibilityLabel="SoundCloud track or playlist URL" autoCapitalize="none" autoCorrect={false}
+                      style={{ flex: 1, color: "white", fontSize: 12 }} />
+                    <Pressable disabled={soundCloudLoading} onPress={async () => {
+                      soundCloudLoad.current?.abort();
+                      const request = new AbortController();
+                      soundCloudLoad.current = request;
+                      setSoundCloudLoading(true);
+                      setMusicError("");
+                      const timeout = setTimeout(() => request.abort(), 15000);
+                      try {
+                        const url = await resolveSoundCloudInput(soundCloudInput, request.signal);
+                        if (request.signal.aborted || soundCloudLoad.current !== request) return;
+                        if (url !== soundCloudUrl) setIsPlaying(false);
+                        setSoundCloudUrl(url);
+                        setSoundCloudInput("");
+                      } catch (error) {
+                        if (soundCloudLoad.current === request) {
+                          setMusicError(request.signal.aborted ? "SoundCloud took too long. Try again or paste Share → Embed code." : (error instanceof Error ? error.message : "SoundCloud could not load."));
+                        }
+                      } finally {
+                        clearTimeout(timeout);
+                        if (soundCloudLoad.current === request) {
+                          soundCloudLoad.current = null;
+                          setSoundCloudLoading(false);
+                        }
+                      }
+                    }}><Text style={{ color: modeColors.accent }}>{soundCloudLoading ? "LOADING…" : "LOAD"}</Text></Pressable>
+                  </View>
+                  {!soundCloudUrl && <Text style={{ color: "#999", paddingHorizontal: 12, fontSize: 12 }}>Private playlist? Paste the code from SoundCloud Share → Embed. It stays private; anyone with the code can listen.</Text>}
+                  {soundCloudUrl && <SoundCloudPlayer key={soundCloudUrl} ref={soundCloudRef} url={soundCloudUrl}
+                    volume={musicVolume} onPlayingChange={setIsPlaying} />}
+                </View>
+              ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "spotify" ? (
                 <View style={{ height: 200, zIndex: 2 }}>
                   {Platform.OS === "web" ? (
                     <View className="flex-1 items-center justify-center p-6" style={{ backgroundColor: "#0a0a0a" }}>
@@ -2283,8 +2261,9 @@ export const MixwaveScreen: React.FC = () => {
             <View className="p-5" style={{ backgroundColor: "rgba(255,255,255,0.02)" }}>
               {musicSource ? (
                 <View>
+                  {musicError ? <Text accessibilityRole="alert" style={{ color: "#FF9A5A", marginBottom: 12 }}>{musicError}</Text> : null}
                   {/* Simplified Controls */}
-                  {musicSource === "local" && currentTrack && (
+                  {((musicSource === "local" && currentTrack) || (musicSource === "soundcloud" && soundCloudUrl)) && (
                     <View>
                       <View className="flex-row items-center justify-between mb-4">
                         <View className="flex-row items-center" style={{ gap: 6 }}>
@@ -2348,9 +2327,9 @@ export const MixwaveScreen: React.FC = () => {
                           minimumValue={0}
                           maximumValue={100}
                           step={1}
+                          accessibilityLabel="Music volume"
                           value={channelBGain}
                           onValueChange={(value) => {
-                            setChannelBGain(value);
                             setMusicVideoVolume(value);
                           }}
                           onTouchStart={() => {
@@ -2438,7 +2417,6 @@ export const MixwaveScreen: React.FC = () => {
                           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                           const newValue = !autoDuckEnabled;
                           setAutoDuckEnabled(newValue);
-                          audioMixer.updateState({ autoDuckEnabled: newValue });
                         }}
                         className="border px-4 py-2.5 rounded-2xl mb-4 flex-row items-center justify-between"
                         style={{

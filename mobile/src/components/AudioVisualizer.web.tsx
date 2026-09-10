@@ -59,7 +59,6 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     const animatedHeight = isActive ? minHeight + (maxHeight - minHeight) * baseHeight : minHeight;
 
     return {
-      flex: 1,
       backgroundColor: modeColors.accent,
       borderRadius: 3,
       minWidth: 3,
