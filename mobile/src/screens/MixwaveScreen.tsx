@@ -1334,19 +1334,11 @@ export const MixwaveScreen: React.FC = () => {
                             fontSize: 50,
                             fontWeight: "bold",
                             letterSpacing: 8,
-                            color: "#FF9A5A",
-                            textShadowColor: "rgba(95,212,244,0.25)",
+                            color: "#FF786A",
+                            textShadowColor: "rgba(255,92,76,0.65)",
                             textShadowOffset: { width: 0, height: 0 },
-                            textShadowRadius: 12,
+                            textShadowRadius: 22,
                           },
-                          Platform.OS === "web"
-                            ? ({
-                                backgroundImage: "linear-gradient(90deg, #5FD4F4 0%, #FF9A5A 100%)",
-                                backgroundClip: "text",
-                                WebkitBackgroundClip: "text",
-                                WebkitTextFillColor: "transparent",
-                              } as any)
-                            : null,
                           animatedLoadingLogoStyle,
                         ]}
                       >
@@ -1379,20 +1371,12 @@ export const MixwaveScreen: React.FC = () => {
                           fontSize: 48,
                           fontWeight: "bold",
                           letterSpacing: 8,
-                          color: "#FF9A5A",
-                          textShadowColor: "rgba(95,212,244,0.25)",
+                          color: "#FF786A",
+                          textShadowColor: "rgba(255,92,76,0.65)",
                           textShadowOffset: { width: 0, height: 0 },
-                          textShadowRadius: 12,
+                          textShadowRadius: 22,
                           marginBottom: 30,
                         },
-                        Platform.OS === "web"
-                          ? ({
-                              backgroundImage: "linear-gradient(90deg, #5FD4F4 0%, #FF9A5A 100%)",
-                              backgroundClip: "text",
-                              WebkitBackgroundClip: "text",
-                              WebkitTextFillColor: "transparent",
-                            } as any)
-                          : null,
                       ]}
                     >
                       3L3V8R
