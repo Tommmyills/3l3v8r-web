@@ -73,6 +73,9 @@ window.musicCommand = function(command) {
   if (!ready) return;
   if (command.type === "volume" && Number.isFinite(command.value)) widget.setVolume(Math.max(0, Math.min(100, command.value)));
   if (command.type === "toggle") widget.toggle();
+  if (command.type === "next") widget.next();
+  if (command.type === "previous") widget.prev();
+  if (command.type === "skip" && Number.isInteger(command.value)) widget.skip(command.value);
 };
 window.addEventListener("message", function(event) {
   if (event.source !== window.parent || !event.data || event.data.source !== "elevator-music-control") return;

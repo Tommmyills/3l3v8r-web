@@ -3,7 +3,12 @@ import { Platform, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { soundCloudWidgetHTML } from "../utils/soundCloudWidget";
 
-export interface SoundCloudPlayerRef { toggle(): void }
+export interface SoundCloudPlayerRef {
+  toggle(): void;
+  next(): void;
+  previous(): void;
+  skip(index: number): void;
+}
 interface Props {
   url: string;
   volume: number;
@@ -24,7 +29,12 @@ export const SoundCloudPlayer = forwardRef<SoundCloudPlayerRef, Props>(({ url, v
     else webView.current?.injectJavaScript(`window.musicCommand && window.musicCommand(${JSON.stringify(command)}); true;`);
   }, []);
 
-  useImperativeHandle(ref, () => ({ toggle: () => send("toggle") }), [send]);
+  useImperativeHandle(ref, () => ({
+    toggle: () => send("toggle"),
+    next: () => send("next"),
+    previous: () => send("previous"),
+    skip: (index: number) => send("skip", index),
+  }), [send]);
   useEffect(() => { send("volume", volume); }, [volume, send]);
 
   const receive = useCallback((raw: string) => {

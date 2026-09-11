@@ -54,7 +54,12 @@ import {
   HardwareHeader,
   HardwareScrew,
   HardwareSectionTitle,
+  SynthwaveIdleDisplay,
+  SynthwaveIdleDisplayV2,
+  SynthwaveMediaIdleDisplay,
+  SynthwaveMediaIdleDisplayV2,
   hardwarePalette,
+  hardwareRaisedButton,
 } from "../components/HardwareChrome";
 
 type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | "spotify" | null;
@@ -241,7 +246,7 @@ export const MixwaveScreen: React.FC = () => {
   const [autoDuckEnabled, setAutoDuckEnabled] = useState(false);
   const speechActive = mainPlaying && !mainVideo.isMuted && channelAGain > 0;
   const isDucking = autoDuckEnabled && speechActive;
-  const musicVolume = musicVideo.isMuted ? 0 : channelBGain * (isDucking ? 0.6 : 1);
+  const musicVolume = musicVideo.isMuted ? 0 : channelBGain;
   const musicVolumeRef = useRef(musicVolume);
   musicVolumeRef.current = musicVolume;
 
@@ -924,7 +929,7 @@ export const MixwaveScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
-            style={{ backgroundColor: isHardware ? hardwarePalette.shell : "#1A1A1A" }}
+            style={{ backgroundColor: isHardware ? "#1b1c1d" : "#1A1A1A" }}
           >
             {isHardware && (
               <HardwareHeader
@@ -964,7 +969,7 @@ export const MixwaveScreen: React.FC = () => {
                 <Text
                   className="text-3xl font-bold tracking-widest"
                   style={{
-                    fontFamily: "monospace",
+                    fontFamily: isHardware ? "Arial Black" : "monospace",
                     letterSpacing: 4,
                     color: "#1a1a1a",
                     textShadowColor: modeColors.accent,
@@ -977,7 +982,7 @@ export const MixwaveScreen: React.FC = () => {
                 <Text
                   className="text-3xl font-bold tracking-widest"
                   style={{
-                    fontFamily: "monospace",
+                    fontFamily: isHardware ? "Arial Black" : "monospace",
                     letterSpacing: 4,
                     color: "#1a1a1a",
                     textShadowColor: modeColors.accent,
@@ -1223,7 +1228,7 @@ export const MixwaveScreen: React.FC = () => {
             borderWidth: 1,
             borderColor: hardwarePalette.line,
             borderRadius: 10,
-            backgroundColor: hardwarePalette.shellLight,
+            backgroundColor: "#2a2b2c",
             shadowColor: "#000",
             shadowOffset: { width: 0, height: 5 },
             shadowOpacity: 0.18,
@@ -1248,14 +1253,14 @@ export const MixwaveScreen: React.FC = () => {
             <View
               className="px-4 py-2.5 border-b flex-row items-center justify-between"
               style={{
-                backgroundColor: isHardware ? hardwarePalette.shellLight : "rgba(255,255,255,0.02)",
+                backgroundColor: isHardware ? "#2a2b2c" : "rgba(255,255,255,0.02)",
                 borderColor: isHardware ? hardwarePalette.line : "rgba(255,255,255,0.08)",
                 minHeight: isHardware ? 46 : undefined,
               }}
             >
               {isHardware ? (
                 <>
-                  <HardwareSectionTitle title="TUTORIAL" detail="LEARN / WATCH / GET STARTED" />
+                  <HardwareSectionTitle title="MEDIA" detail="L3ARN / EXPLORE" />
                   <View style={{ marginLeft: 12 }}><HardwareScrew size={12} /></View>
                 </>
               ) : <><View className="flex-row items-center" style={{ gap: 8 }}>
@@ -1297,7 +1302,7 @@ export const MixwaveScreen: React.FC = () => {
                 marginHorizontal: tutorialVideoWidth ? 0 : isHardware ? 18 : 0,
                 marginTop: isHardware ? 12 : 0,
                 borderRadius: isHardware ? 12 : 16,
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "#121314",
                 borderColor: isHardware ? "#8f8b85" : "rgba(255,255,255,0.08)",
                 borderWidth: isHardware ? 1 : 0,
               }}
@@ -1460,55 +1465,34 @@ export const MixwaveScreen: React.FC = () => {
                   )}
                 </>
               ) : (
-                <ImageBackground
-                  source={require("../../assets/elev8ryoutubeholder-1765124402018.png")}
-                  className="flex-1"
-                  resizeMode="cover"
+                <Pressable
+                  onPress={() => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    setShowMainInput(true);
+                  }}
+                  style={{ flex: 1 }}
                 >
-                  <View
-                    className="absolute inset-0"
-                    style={{ backgroundColor: "rgba(0,0,0,0.70)" }}
-                  />
-                  <Pressable
-                    onPress={() => {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      setShowMainInput(true);
-                    }}
-                    className="flex-1 items-center justify-center"
-                  >
-                    <Text
-                      style={[
-                        {
-                          fontFamily: "monospace",
-                          fontSize: 48,
-                          fontWeight: "bold",
-                          letterSpacing: 8,
-                          color: "#FF786A",
-                          textShadowColor: "rgba(255,92,76,0.65)",
-                          textShadowOffset: { width: 0, height: 0 },
-                          textShadowRadius: 22,
-                          marginBottom: 30,
-                        },
-                      ]}
+                  {isHardware ? (
+                    <SynthwaveMediaIdleDisplayV2 />
+                  ) : (
+                    <ImageBackground
+                      source={require("../../assets/elev8ryoutubeholder-1765124402018.png")}
+                      style={{ flex: 1 }}
+                      resizeMode="cover"
                     >
-                      3L3V8R
-                    </Text>
-                    <View className="border border-dashed px-8 py-4 rounded-xl" style={{ borderColor: `${modeColors.accent}40` }}>
-                      <Text
-                        className="text-xs font-bold text-center tracking-widest"
-                        style={{ fontFamily: "monospace", color: modeColors.accent, opacity: 0.8 }}
-                      >
-                        TAP TO LOAD VIDEO
-                      </Text>
-                    </View>
-                  </Pressable>
-                </ImageBackground>
+                      <View
+                        className="absolute inset-0"
+                        style={{ backgroundColor: "rgba(0,0,0,0.70)" }}
+                      />
+                    </ImageBackground>
+                  )}
+                </Pressable>
               )}
             </View>
 
             {/* Controls */}
             <View className="p-5" style={{ backgroundColor: isHardware ? hardwarePalette.shellLight : "rgba(255,255,255,0.02)" }}>
-              {isHardware && (
+              {isHardware && (showMainInput || !!mainVideo.videoId) && (
                 <View style={{ marginBottom: mainVideo.videoId ? 18 : 0 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 9 }}>
                     <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
@@ -1561,7 +1545,7 @@ export const MixwaveScreen: React.FC = () => {
                         shadowRadius: 4,
                       }}
                     >
-                      <Text style={{ color: "#111", fontFamily: "monospace", fontWeight: "900", fontSize: 14, letterSpacing: 2 }}>LOAD</Text>
+                      <Text style={{ color: "#111", fontFamily: isHardware ? "Arial Black" : "monospace", fontWeight: "900", fontSize: isHardware ? 15 : 14, letterSpacing: 2 }}>LOAD</Text>
                       <Ionicons name="arrow-forward" size={18} color="#111" />
                     </Pressable>
                   </View>
@@ -1744,6 +1728,8 @@ export const MixwaveScreen: React.FC = () => {
                     </Pressable>
                   </View>
 
+                  {tutorialExpanded && (
+                    <View>
                   {/* Notes Button */}
                   <Pressable
                     onPress={() => {
@@ -1889,6 +1875,8 @@ export const MixwaveScreen: React.FC = () => {
                     )}
                   </Pressable>
 
+                    </View>
+                  )}
                   {/* Expanded Advanced Controls */}
                   {tutorialExpanded && (
                     <View className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
@@ -2099,7 +2087,7 @@ export const MixwaveScreen: React.FC = () => {
             <View
               className="px-4 py-3 border-b flex-row items-center justify-between"
               style={{
-                backgroundColor: isHardware ? hardwarePalette.shellLight : (musicSource ? `${modeColors.accent}12` : "rgba(255,255,255,0.02)"),
+                backgroundColor: isHardware ? "#2a2b2c" : (musicSource ? `${modeColors.accent}12` : "rgba(255,255,255,0.02)"),
                 borderColor: isHardware ? hardwarePalette.line : (musicSource ? `${modeColors.accent}20` : "rgba(255,255,255,0.08)"),
                 minHeight: isHardware ? 46 : undefined,
               }}
@@ -2134,16 +2122,40 @@ export const MixwaveScreen: React.FC = () => {
 
             {/* Audio Source Selector - Horizontal */}
             {(!musicSource || isHardware) && (
-              <View className="p-4 border-b" style={{ borderColor: isHardware ? hardwarePalette.line : "rgba(255,255,255,0.08)", backgroundColor: isHardware ? hardwarePalette.shell : "rgba(0,0,0,0.3)", flexDirection: "row", alignItems: "center", gap: isHardware ? 12 : 0 }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-                  <View className="flex-row" style={{ gap: 10, alignItems: "center", flexGrow: 1 }}>
+              <View
+                className="p-4 border-b"
+                style={{
+                  borderColor: isHardware ? "#171819" : "rgba(255,255,255,0.08)",
+                  backgroundColor: isHardware ? "#292a2b" : "rgba(0,0,0,0.3)",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: isHardware ? 12 : 0,
+                }}
+              >
+                <ScrollView
+                  horizontal={isHardware ? false : true}
+                  showsHorizontalScrollIndicator={false}
+                  style={{ flex: 1, width: "100%" }}
+                  contentContainerStyle={isHardware ? { flexGrow: 1, width: "100%" } : { flexGrow: 1 }}
+                >
+                  <View
+                    className="flex-row"
+                    style={{
+                      gap: 10,
+                      alignItems: "center",
+                      flexGrow: 1,
+                      flexWrap: isHardware ? "wrap" : "nowrap",
+                      justifyContent: isHardware ? "center" : "flex-start",
+                      width: isHardware ? "100%" : undefined,
+                    }}
+                  >
                     {[
+                      { id: "soundcloud", label: "SNDCLD", icon: "cloud-outline", color: "#FF5500" },
                       { id: "local", label: "LOCAL MP3", icon: "musical-notes", color: modeColors.accent },
-                      { id: "bandcamp", label: "BANDCAMP", icon: "radio", color: "#1DA0C3" },
                       { id: "mixcloud", label: "MIXCLOUD", icon: "cloud", color: "#FF7F00" },
-                      { id: "soundcloud", label: "SOUNDCLOUD", icon: "cloud-outline", color: "#FF5500" },
+                      { id: "bandcamp", label: "BNDCP", icon: "radio", color: "#1DA0C3" },
+                      { id: "apple-music", label: "APPLE", icon: "logo-apple", color: "#FC3C44" },
                       { id: "spotify", label: "SPOTIFY", icon: "musical-note", color: "#1DB954" },
-                      { id: "apple-music", label: "APPLE MUSIC", icon: "logo-apple", color: "#FC3C44" },
                     ].map((source) => (
                       <Pressable
                         key={source.id}
@@ -2156,26 +2168,44 @@ export const MixwaveScreen: React.FC = () => {
                           setMusicSource(source.id as MusicSource);
                         }}
                         className="border px-4 py-3 rounded-2xl flex-row items-center"
-                        style={{
-                          borderColor: isHardware ? (source.id === musicSource ? "#55514c" : hardwarePalette.line) : `${source.color}40`,
-                          backgroundColor: isHardware ? (source.id === musicSource ? "#252525" : "#e8e5e0") : `${source.color}15`,
-                          shadowColor: isHardware ? "#000" : source.color,
+                        style={isHardware ? [
+                          hardwareRaisedButton(source.id === musicSource),
+                          {
+                            width: "31%",
+                            minWidth: 96,
+                            minHeight: 92,
+                            flexGrow: 1,
+                            paddingHorizontal: 8,
+                            paddingVertical: 14,
+                            gap: 9,
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }
+                        ] : {
+                          borderColor: `${source.color}40`,
+                          backgroundColor: `${source.color}15`,
+                          shadowColor: source.color,
                           shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: isHardware ? 0.24 : 0.35,
-                          shadowRadius: isHardware ? 4 : 12,
+                          shadowOpacity: 0.35,
+                          shadowRadius: 12,
                           gap: 8,
-                          minWidth: isHardware ? 170 : undefined,
-                          flexGrow: isHardware ? 1 : 0,
-                          minHeight: isHardware ? 58 : undefined,
-                          borderRadius: isHardware ? 7 : 16,
                         }}
                       >
-                        <Ionicons name={source.icon as any} size={16} color={source.color} />
+                        <Ionicons
+                          name={source.icon as any}
+                          size={isHardware ? 25 : 16}
+                          color={isHardware ? "#111111" : source.color}
+                        />
                         <Text
                           className="text-xs font-bold tracking-wider whitespace-nowrap"
                           style={{
-                            fontFamily: "monospace",
-                            color: source.color,
+                            fontFamily: isHardware ? "Arial Black" : "monospace",
+                            color: isHardware ? "#161616" : source.color,
+                            fontSize: isHardware ? 11 : undefined,
+                            fontWeight: isHardware ? "800" : undefined,
+                            letterSpacing: isHardware ? 0.8 : undefined,
+                            textAlign: "center",
                             textShadowColor: isHardware ? "transparent" : source.color,
                             textShadowOffset: { width: 0, height: 0 },
                             textShadowRadius: 6,
@@ -2187,12 +2217,12 @@ export const MixwaveScreen: React.FC = () => {
                     ))}
                   </View>
                 </ScrollView>
-                {isHardware && <HardwareGrille columns={6} rows={4} />}
+                {isHardware ? null : null}
               </View>
             )}
 
             {/* Music Player */}
-            <View className="border-b overflow-hidden relative" style={{ minHeight: 220, marginHorizontal: isHardware ? 18 : 0, marginTop: isHardware ? 12 : 0, borderRadius: isHardware ? 12 : 16, backgroundColor: "#1a1a1a", borderColor: isHardware ? "#77736e" : "rgba(255,255,255,0.08)", borderWidth: isHardware ? 1 : 0 }}>
+            <View className="border-b overflow-hidden relative" style={{ minHeight: 220, marginHorizontal: isHardware ? 18 : 0, marginTop: isHardware ? 12 : 0, borderRadius: isHardware ? 12 : 16, backgroundColor: "#121314", borderColor: isHardware ? "#77736e" : "rgba(255,255,255,0.08)", borderWidth: isHardware ? 1 : 0 }}>
               {/* Audio Visualizer - Behind everything in music player - BRIGHTEST */}
               {visualizerEnabled && (
                 <AudioVisualizer
@@ -2306,13 +2336,49 @@ export const MixwaveScreen: React.FC = () => {
                   )}
                 </View>
               ) : musicSource === "soundcloud" ? (
-                <View style={{ height: 260, zIndex: 2 }}>
-                  <View className="flex-row items-center px-3 py-2" style={{ gap: 8 }}>
+                <View style={{ height: soundCloudUrl ? 320 : 190, zIndex: 2 }}>
+                  <View style={{ paddingHorizontal: 12, paddingTop: 12, gap: 10 }}>
+                    {!soundCloudUrl && (
+                      <Text
+                        style={{
+                          color: "#d8d8d8",
+                          fontFamily: "monospace",
+                          fontSize: 10,
+                          fontWeight: "700",
+                          letterSpacing: 1.5,
+                        }}
+                      >
+                        PASTE SOUNDCLOUD LINK
+                      </Text>
+                    )}
                     <TextInput value={soundCloudInput} onChangeText={setSoundCloudInput}
-                      placeholder="SoundCloud link or private embed code" placeholderTextColor="#777"
+                      placeholder="Track or playlist URL" placeholderTextColor="#707276"
                       accessibilityLabel="SoundCloud track or playlist URL" autoCapitalize="none" autoCorrect={false}
-                      style={{ flex: 1, color: "white", fontSize: 12 }} />
-                    <Pressable disabled={soundCloudLoading} onPress={async () => {
+                      style={{
+                        width: "100%",
+                        minHeight: 46,
+                        color: "#f2f2f2",
+                        fontSize: 13,
+                        backgroundColor: "#111214",
+                        borderWidth: 1,
+                        borderColor: "#55585c",
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                      }} />
+                    <Pressable
+                      disabled={soundCloudLoading || !soundCloudInput.trim()}
+                      style={{
+                        width: "100%",
+                        minHeight: 46,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 8,
+                        backgroundColor:
+                          soundCloudLoading || !soundCloudInput.trim()
+                            ? "#343638"
+                            : modeColors.accent,
+                      }}
+                      onPress={async () => {
                       soundCloudLoad.current?.abort();
                       const request = new AbortController();
                       soundCloudLoad.current = request;
@@ -2336,11 +2402,135 @@ export const MixwaveScreen: React.FC = () => {
                           setSoundCloudLoading(false);
                         }
                       }
-                    }}><Text style={{ color: modeColors.accent }}>{soundCloudLoading ? "LOADING…" : "LOAD"}</Text></Pressable>
+                    }}>
+                      <Text
+                        style={{
+                          color:
+                            soundCloudLoading || !soundCloudInput.trim()
+                              ? "#777"
+                              : "#111",
+                          fontFamily: "monospace",
+                          fontWeight: "900",
+                          fontSize: 12,
+                          letterSpacing: 1.5,
+                        }}
+                      >
+                        {soundCloudLoading ? "LOADING…" : "LOAD SOUNDTRACK"}
+                      </Text>
+                    </Pressable>
                   </View>
-                  {!soundCloudUrl && <Text style={{ color: "#999", paddingHorizontal: 12, fontSize: 12 }}>Private playlist? Paste the code from SoundCloud Share → Embed. It stays private; anyone with the code can listen.</Text>}
-                  {soundCloudUrl && <SoundCloudPlayer key={soundCloudUrl} ref={soundCloudRef} url={soundCloudUrl}
-                    volume={musicVolume} onPlayingChange={setIsPlaying} />}
+                  {!soundCloudUrl && (
+                    <Text
+                      style={{
+                        color: "#777",
+                        paddingHorizontal: 12,
+                        paddingTop: 6,
+                        fontSize: 10,
+                      }}
+                    >
+                      Private playlist? Use SoundCloud Share → Embed code.
+                    </Text>
+                  )}
+                  {soundCloudUrl && (
+                    <>
+                      <View style={{ flex: 1 }}>
+                        <SoundCloudPlayer
+                          key={`soundcloud-${soundCloudUrl}`}
+                          ref={soundCloudRef}
+                          url={soundCloudUrl}
+                          volume={musicVolume}
+                          onPlayingChange={setIsPlaying}
+                        />
+                      </View>
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 10,
+                          paddingHorizontal: 12,
+                          paddingTop: 8,
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => soundCloudRef.current?.previous()}
+                          style={{
+                            flex: 1,
+                            minHeight: 38,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#222426",
+                            borderWidth: 1,
+                            borderColor: "#5f6266",
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#e8e8e8",
+                              fontFamily: "monospace",
+                              fontSize: 11,
+                              fontWeight: "700",
+                              letterSpacing: 1.5,
+                            }}
+                          >
+                            ◀ PREV
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => soundCloudRef.current?.toggle()}
+                          style={{
+                            flex: 1.2,
+                            minHeight: 38,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: modeColors.accent,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#111",
+                              fontFamily: "monospace",
+                              fontSize: 11,
+                              fontWeight: "900",
+                              letterSpacing: 1.5,
+                            }}
+                          >
+                            {isPlaying ? "PAUSE" : "PLAY"}
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() => soundCloudRef.current?.next()}
+                          style={{
+                            flex: 1,
+                            minHeight: 38,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor: "#222426",
+                            borderWidth: 1,
+                            borderColor: "#5f6266",
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#e8e8e8",
+                              fontFamily: "monospace",
+                              fontSize: 11,
+                              fontWeight: "700",
+                              letterSpacing: 1.5,
+                            }}
+                          >
+                            NEXT ▶
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </>
+                  )}
                 </View>
               ) : musicSource === "bandcamp" || musicSource === "mixcloud" || musicSource === "apple-music" || musicSource === "spotify" ? (
                 <View style={{ height: 200, zIndex: 2 }}>
@@ -2383,60 +2573,17 @@ export const MixwaveScreen: React.FC = () => {
                   )}
                 </View>
               ) : (
-                <View style={{ zIndex: 2, minHeight: 220, backgroundColor: "#0a0a0a" }}>
-                  {/* Idle Audio Visualizer - Subtle ambient animation */}
-                  <AudioVisualizer
-                    mode={audioMode}
-                    audioLevel={30}
-                    isActive={true}
-                    opacity={0.25}
-                  />
-                  <View className="flex-1 items-center justify-center p-6" style={{ zIndex: 3 }}>
-                    <Text
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 20,
-                        fontWeight: "bold",
-                        letterSpacing: 6,
-                        color: modeColors.accent,
-                        textShadowColor: modeColors.glow,
-                        textShadowOffset: { width: 0, height: 0 },
-                        textShadowRadius: 15,
-                        marginBottom: 4,
-                      }}
-                    >
-                      SOUNDTRACK
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: 9,
-                        letterSpacing: 4,
-                        color: modeColors.accent,
-                        opacity: 0.4,
-                        marginBottom: 20,
-                      }}
-                    >
-                      ADD YOUR VIBE
-                    </Text>
-                    <View
-                      className="border border-dashed px-6 py-3 rounded-xl"
-                      style={{ borderColor: `${modeColors.accent}30` }}
-                    >
-                      <Text
-                        style={{
-                          fontFamily: "monospace",
-                          fontSize: 10,
-                          letterSpacing: 3,
-                          color: modeColors.accent,
-                          opacity: 0.6,
-                        }}
-                      >
-                        SELECT SOURCE ABOVE
+                isHardware ? (
+                  <SynthwaveIdleDisplayV2 />
+                ) : (
+                  <View style={{ zIndex: 2, minHeight: 220, backgroundColor: "#0a0a0a" }}>
+                    <View className="flex-1 items-center justify-center p-6">
+                      <Text style={{ color: modeColors.accent, fontFamily: "monospace" }}>
+                        NO SOURCE SELECTED
                       </Text>
                     </View>
                   </View>
-                </View>
+                )
               )}
             </View>
 
