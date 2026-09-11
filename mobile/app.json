@@ -9,10 +9,18 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.clubsodapapi.3l3v8r"
+      "bundleIdentifier": "com.clubsodapapi.3l3v8r",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "667c3cc6-8f66-4b0c-ae22-8a696f2ad9bd"
+      }
     }
   }
 }
