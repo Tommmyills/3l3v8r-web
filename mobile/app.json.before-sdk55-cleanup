@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.clubsodapapi.3l3v8r",
@@ -13,7 +14,9 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "android": {},
+    "android": {
+      "edgeToEdgeEnabled": true
+    },
     "extra": {
       "eas": {
         "projectId": "667c3cc6-8f66-4b0c-ae22-8a696f2ad9bd"

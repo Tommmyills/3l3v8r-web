@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { View, Text } from "react-native";
-import Animated, {
+import Animated, { type SharedValue,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
@@ -227,7 +227,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 };
 
 interface VisualizerBarProps {
-  height: Animated.SharedValue<number>;
+  height: SharedValue<number>;
   color: string;
   glowColor: string;
   secondaryColor: string;
