@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.clubsodapapi.3l3v8r"
     },
     "android": {
       "edgeToEdgeEnabled": true

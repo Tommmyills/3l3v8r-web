@@ -10,6 +10,7 @@ import {
   ImageBackground,
   Alert,
   Platform,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { YoutubeIframeRef } from "react-native-youtube-iframe";
@@ -47,6 +48,14 @@ import { VoiceAssistModal } from "../components/VoiceAssistModal";
 import { useVoiceAssistStore } from "../state/voiceAssistStore";
 import { FavoritesScreen } from "./FavoritesScreen";
 import { useFavoritesStore } from "../state/favoritesStore";
+import {
+  HardwareFooter,
+  HardwareGrille,
+  HardwareHeader,
+  HardwareScrew,
+  HardwareSectionTitle,
+  hardwarePalette,
+} from "../components/HardwareChrome";
 
 type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | "spotify" | null;
 
@@ -94,6 +103,35 @@ export const MixwaveScreen: React.FC = () => {
   const [mainUrlInput, setMainUrlInput] = useState("");
   const [showMainInput, setShowMainInput] = useState(false);
   const [musicSource, setMusicSource] = useState<MusicSource>(null);
+  const [visualStyle, setVisualStyle] = useState<"classic" | "hardware">("hardware");
+  const isHardware = visualStyle === "hardware";
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+
+  const isMobileLayout = screenWidth <= 900;
+  const isLandscapeMobile = isMobileLayout && screenWidth > screenHeight;
+
+  const tutorialSideMargin = 18;
+  const tutorialMaxWidth = Math.max(
+    0,
+    screenWidth - tutorialSideMargin * 2
+  );
+
+  const tutorialLandscapeHeight = Math.max(
+    180,
+    screenHeight - insets.top - insets.bottom - 16
+  );
+
+  const tutorialVideoHeight =
+    isHardware && isMobileLayout
+      ? isLandscapeMobile
+        ? Math.min(tutorialLandscapeHeight, tutorialMaxWidth * 9 / 16)
+        : tutorialMaxWidth * 9 / 16
+      : 320;
+
+  const tutorialVideoWidth =
+    isHardware && isMobileLayout
+      ? tutorialVideoHeight * 16 / 9
+      : undefined;
 
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -863,13 +901,22 @@ export const MixwaveScreen: React.FC = () => {
   return (
     <View className="flex-1">
       <LinearGradient
-        colors={["#151923", "#251433", "#18132A"]}
+        colors={isHardware ? ["#efede9", "#d8d4ce", "#ebe8e3"] : ["#151923", "#251433", "#18132A"]}
         locations={[0, 0.5, 1]}
-        style={{ flex: 1, paddingTop: insets.top }}
+        style={{ flex: 1, paddingTop: insets.top, paddingHorizontal: isHardware ? 8 : 0 }}
       >
         <AnimatedView
           className="flex-1"
-          style={animatedBorderStyle}
+          style={isHardware ? {
+            borderWidth: 1,
+            borderColor: "#aaa69f",
+            borderRadius: 18,
+            overflow: "hidden",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.24,
+            shadowRadius: 18,
+          } : animatedBorderStyle}
         >
           <ScrollView
             className="flex-1"
@@ -877,10 +924,39 @@ export const MixwaveScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             bounces={false}
             overScrollMode="never"
-            style={{ backgroundColor: "#1A1A1A" }}
+            style={{ backgroundColor: isHardware ? hardwarePalette.shell : "#1A1A1A" }}
           >
+            {isHardware && (
+              <HardwareHeader
+                audioMode={audioMode}
+                onModeChange={(mode) => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setAudioMode(mode);
+                }}
+                onSave={handleSaveMix}
+                onFavorites={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setShowFavorites(true);
+                }}
+                onNotes={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setShowNotesScreen(true);
+                }}
+                onProfile={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setShowProfile(true);
+                }}
+                onSettings={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  setShowSettings(true);
+                }}
+                favoritesCount={favoritesCount}
+                sessionNotesCount={sessionNotesCount}
+                onClassic={() => setVisualStyle("classic")}
+              />
+            )}
             {/* Header with Branding */}
-            <View className="px-6 pt-8 pb-4 border-b" style={{ borderColor: "rgba(255,255,255,0.12)" }}>
+            <View className="px-6 pt-8 pb-4 border-b" style={{ borderColor: "rgba(255,255,255,0.12)", display: isHardware ? "none" : "flex" }}>
 
           <View className="flex-row items-center justify-between mb-4">
             <View>
@@ -1132,13 +1208,30 @@ export const MixwaveScreen: React.FC = () => {
               </Pressable>
             ))}
           </View>
+          <Pressable
+            onPress={() => setVisualStyle("hardware")}
+            className="self-end border px-3 py-1.5 rounded-xl mt-3"
+            style={{ borderColor: "rgba(255,255,255,0.14)", backgroundColor: "rgba(255,255,255,0.03)" }}
+          >
+            <Text style={{ color: "#777", fontFamily: "monospace", fontSize: 9, letterSpacing: 1.2 }}>CLASSIC / HARDWARE</Text>
+          </Pressable>
         </View>
 
         {/* Main Video Section */}
-        <View className="px-6 mt-8 mb-6">
-          <BlurView intensity={20} tint="dark" className="rounded-3xl overflow-hidden" style={{
+        <View className={isHardware ? "px-3 mt-4 mb-4" : "px-6 mt-8 mb-6"}>
+          <BlurView intensity={isHardware ? 8 : 20} tint={isHardware ? "light" : "dark"} className="overflow-hidden" style={isHardware ? {
+            borderWidth: 1,
+            borderColor: hardwarePalette.line,
+            borderRadius: 10,
+            backgroundColor: hardwarePalette.shellLight,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 5 },
+            shadowOpacity: 0.18,
+            shadowRadius: 7,
+          } : {
             borderWidth: 1,
             borderColor: "rgba(255,255,255,0.12)",
+            borderRadius: 24,
             backgroundColor: "rgba(30,30,30,0.5)",
             shadowColor: modeColors.glow,
             shadowOffset: { width: 0, height: 8 },
@@ -1155,11 +1248,17 @@ export const MixwaveScreen: React.FC = () => {
             <View
               className="px-4 py-2.5 border-b flex-row items-center justify-between"
               style={{
-                backgroundColor: "rgba(255,255,255,0.02)",
-                borderColor: "rgba(255,255,255,0.08)",
+                backgroundColor: isHardware ? hardwarePalette.shellLight : "rgba(255,255,255,0.02)",
+                borderColor: isHardware ? hardwarePalette.line : "rgba(255,255,255,0.08)",
+                minHeight: isHardware ? 46 : undefined,
               }}
             >
-              <View className="flex-row items-center" style={{ gap: 8 }}>
+              {isHardware ? (
+                <>
+                  <HardwareSectionTitle title="TUTORIAL" detail="LEARN / WATCH / GET STARTED" />
+                  <View style={{ marginLeft: 12 }}><HardwareScrew size={12} /></View>
+                </>
+              ) : <><View className="flex-row items-center" style={{ gap: 8 }}>
                 <Text
                   className="text-gray-400 text-sm font-semibold"
                   style={{ letterSpacing: 0.5 }}
@@ -1185,17 +1284,30 @@ export const MixwaveScreen: React.FC = () => {
               <View
                 className="w-2 h-2 rounded-full"
                 style={{ backgroundColor: mainVideo.videoId ? modeColors.accent : "#333" }}
-              />
+              /></>}
             </View>
 
             {/* Video Player with rounded corners */}
-            <View className="w-full border-b relative rounded-2xl overflow-hidden" style={{ height: 320, backgroundColor: "#1a1a1a", borderColor: "rgba(255,255,255,0.08)" }}>
+            <View
+              className="border-b relative overflow-hidden"
+              style={{
+                height: tutorialVideoHeight,
+                width: tutorialVideoWidth,
+                alignSelf: tutorialVideoWidth ? "center" : undefined,
+                marginHorizontal: tutorialVideoWidth ? 0 : isHardware ? 18 : 0,
+                marginTop: isHardware ? 12 : 0,
+                borderRadius: isHardware ? 12 : 16,
+                backgroundColor: "#1a1a1a",
+                borderColor: isHardware ? "#8f8b85" : "rgba(255,255,255,0.08)",
+                borderWidth: isHardware ? 1 : 0,
+              }}
+            >
               {mainVideo.videoId ? (
                 <>
                   <YoutubePlayer
                     ref={mainPlayerRef}
                     key={`main-${mainVideo.videoId}`}
-                    height={320}
+                    height={tutorialVideoHeight}
                     play={mainPlaying}
                     videoId={mainVideo.videoId}
                     volume={channelAGain}
@@ -1395,9 +1507,68 @@ export const MixwaveScreen: React.FC = () => {
             </View>
 
             {/* Controls */}
-            <View className="p-5" style={{ backgroundColor: "rgba(255,255,255,0.02)" }}>
+            <View className="p-5" style={{ backgroundColor: isHardware ? hardwarePalette.shellLight : "rgba(255,255,255,0.02)" }}>
+              {isHardware && (
+                <View style={{ marginBottom: mainVideo.videoId ? 18 : 0 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 9 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
+                    <Text style={{ color: hardwarePalette.ink, fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 2 }}>INPUT URL</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "stretch", gap: 10 }}>
+                    <TextInput
+                      value={mainUrlInput}
+                      onChangeText={setMainUrlInput}
+                      onSubmitEditing={handleLoadMainVideo}
+                      placeholder="Paste a YouTube URL..."
+                      placeholderTextColor="#6e7074"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={{
+                        flex: 1,
+                        minWidth: 220,
+                        minHeight: 50,
+                        paddingHorizontal: 18,
+                        borderWidth: 1,
+                        borderColor: "#77746f",
+                        borderRadius: 7,
+                        backgroundColor: "#1c1d1f",
+                        color: "#f5f2ed",
+                        fontFamily: "monospace",
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.24,
+                        shadowRadius: 4,
+                      }}
+                    />
+                    <Pressable
+                      onPress={handleLoadMainVideo}
+                      style={{
+                        minWidth: 140,
+                        minHeight: 50,
+                        borderRadius: 7,
+                        borderWidth: 1,
+                        borderColor: "#d13917",
+                        backgroundColor: hardwarePalette.orange,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        gap: 18,
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 4,
+                      }}
+                    >
+                      <Text style={{ color: "#111", fontFamily: "monospace", fontWeight: "900", fontSize: 14, letterSpacing: 2 }}>LOAD</Text>
+                      <Ionicons name="arrow-forward" size={18} color="#111" />
+                    </Pressable>
+                  </View>
+                </View>
+              )}
               {!mainVideo.videoId ? (
-                <Pressable
+                isHardware ? null : <Pressable
                   onPress={() => {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     setShowMainInput(true);
@@ -1898,10 +2069,20 @@ export const MixwaveScreen: React.FC = () => {
         </View>
 
         {/* Music Channel Section */}
-        <View className="px-6 mb-8">
-          <BlurView intensity={20} tint="dark" className="rounded-3xl overflow-hidden" style={{
+        <View className={isHardware ? "px-3 mb-4" : "px-6 mb-8"}>
+          <BlurView intensity={isHardware ? 8 : 20} tint={isHardware ? "light" : "dark"} className="overflow-hidden" style={isHardware ? {
+            borderWidth: 1,
+            borderColor: hardwarePalette.line,
+            borderRadius: 10,
+            backgroundColor: hardwarePalette.shellLight,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 5 },
+            shadowOpacity: 0.18,
+            shadowRadius: 7,
+          } : {
             borderWidth: 1.5,
             borderColor: musicSource ? `${modeColors.accent}50` : "rgba(255,255,255,0.12)",
+            borderRadius: 24,
             backgroundColor: "rgba(30,30,30,0.5)",
             shadowColor: musicSource ? modeColors.glow : "#5FD4F4",
             shadowOffset: { width: 0, height: 8 },
@@ -1918,11 +2099,17 @@ export const MixwaveScreen: React.FC = () => {
             <View
               className="px-4 py-3 border-b flex-row items-center justify-between"
               style={{
-                backgroundColor: musicSource ? `${modeColors.accent}12` : "rgba(255,255,255,0.02)",
-                borderColor: musicSource ? `${modeColors.accent}20` : "rgba(255,255,255,0.08)",
+                backgroundColor: isHardware ? hardwarePalette.shellLight : (musicSource ? `${modeColors.accent}12` : "rgba(255,255,255,0.02)"),
+                borderColor: isHardware ? hardwarePalette.line : (musicSource ? `${modeColors.accent}20` : "rgba(255,255,255,0.08)"),
+                minHeight: isHardware ? 46 : undefined,
               }}
             >
-              <Text
+              {isHardware ? (
+                <>
+                  <HardwareSectionTitle title="SOUNDTRACK" detail="SELECT A SOURCE / BUILD YOUR VIBE" />
+                  <View style={{ marginLeft: 12 }}><HardwareScrew size={12} /></View>
+                </>
+              ) : <><Text
                 className="text-xs font-bold tracking-widest"
                 style={{
                   fontFamily: "monospace",
@@ -1942,14 +2129,14 @@ export const MixwaveScreen: React.FC = () => {
                   shadowOpacity: 0.8,
                   shadowRadius: 4,
                 }}
-              />
+              /></>}
             </View>
 
             {/* Audio Source Selector - Horizontal */}
-            {!musicSource && (
-              <View className="p-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)", backgroundColor: "rgba(0,0,0,0.3)" }}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row" style={{ gap: 10 }}>
+            {(!musicSource || isHardware) && (
+              <View className="p-4 border-b" style={{ borderColor: isHardware ? hardwarePalette.line : "rgba(255,255,255,0.08)", backgroundColor: isHardware ? hardwarePalette.shell : "rgba(0,0,0,0.3)", flexDirection: "row", alignItems: "center", gap: isHardware ? 12 : 0 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
+                  <View className="flex-row" style={{ gap: 10, alignItems: "center", flexGrow: 1 }}>
                     {[
                       { id: "local", label: "LOCAL MP3", icon: "musical-notes", color: modeColors.accent },
                       { id: "bandcamp", label: "BANDCAMP", icon: "radio", color: "#1DA0C3" },
@@ -1970,13 +2157,17 @@ export const MixwaveScreen: React.FC = () => {
                         }}
                         className="border px-4 py-3 rounded-2xl flex-row items-center"
                         style={{
-                          borderColor: `${source.color}40`,
-                          backgroundColor: `${source.color}15`,
-                          shadowColor: source.color,
+                          borderColor: isHardware ? (source.id === musicSource ? "#55514c" : hardwarePalette.line) : `${source.color}40`,
+                          backgroundColor: isHardware ? (source.id === musicSource ? "#252525" : "#e8e5e0") : `${source.color}15`,
+                          shadowColor: isHardware ? "#000" : source.color,
                           shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.35,
-                          shadowRadius: 12,
+                          shadowOpacity: isHardware ? 0.24 : 0.35,
+                          shadowRadius: isHardware ? 4 : 12,
                           gap: 8,
+                          minWidth: isHardware ? 170 : undefined,
+                          flexGrow: isHardware ? 1 : 0,
+                          minHeight: isHardware ? 58 : undefined,
+                          borderRadius: isHardware ? 7 : 16,
                         }}
                       >
                         <Ionicons name={source.icon as any} size={16} color={source.color} />
@@ -1985,7 +2176,7 @@ export const MixwaveScreen: React.FC = () => {
                           style={{
                             fontFamily: "monospace",
                             color: source.color,
-                            textShadowColor: source.color,
+                            textShadowColor: isHardware ? "transparent" : source.color,
                             textShadowOffset: { width: 0, height: 0 },
                             textShadowRadius: 6,
                           }}
@@ -1996,11 +2187,12 @@ export const MixwaveScreen: React.FC = () => {
                     ))}
                   </View>
                 </ScrollView>
+                {isHardware && <HardwareGrille columns={6} rows={4} />}
               </View>
             )}
 
             {/* Music Player */}
-            <View className="w-full border-b rounded-2xl overflow-hidden relative" style={{ minHeight: 220, backgroundColor: "#1a1a1a", borderColor: "rgba(255,255,255,0.08)" }}>
+            <View className="border-b overflow-hidden relative" style={{ minHeight: 220, marginHorizontal: isHardware ? 18 : 0, marginTop: isHardware ? 12 : 0, borderRadius: isHardware ? 12 : 16, backgroundColor: "#1a1a1a", borderColor: isHardware ? "#77736e" : "rgba(255,255,255,0.08)", borderWidth: isHardware ? 1 : 0 }}>
               {/* Audio Visualizer - Behind everything in music player - BRIGHTEST */}
               {visualizerEnabled && (
                 <AudioVisualizer
@@ -2249,7 +2441,7 @@ export const MixwaveScreen: React.FC = () => {
             </View>
 
             {/* Controls */}
-            <View className="p-5" style={{ backgroundColor: "rgba(255,255,255,0.02)" }}>
+            <View className="p-5" style={{ backgroundColor: isHardware ? "#151617" : "rgba(255,255,255,0.02)", marginHorizontal: isHardware ? 18 : 0, marginBottom: isHardware ? 18 : 0, borderBottomLeftRadius: isHardware ? 12 : 0, borderBottomRightRadius: isHardware ? 12 : 0 }}>
               {musicSource ? (
                 <View>
                   {musicError ? <Text accessibilityRole="alert" style={{ color: "#FF9A5A", marginBottom: 12 }}>{musicError}</Text> : null}
@@ -2554,7 +2746,9 @@ export const MixwaveScreen: React.FC = () => {
         </View>
 
         {/* Bottom HUD - Firmware Style Footer */}
-        <View className="px-6 pb-6 mt-4">
+        {isHardware ? (
+          <HardwareFooter onClassic={() => setVisualStyle("classic")} />
+        ) : <View className="px-6 pb-6 mt-4">
           <View
             className="border-t pt-4"
             style={{ borderColor: "rgba(255,255,255,0.05)" }}
@@ -2577,7 +2771,7 @@ export const MixwaveScreen: React.FC = () => {
               </View>
             </View>
           </View>
-        </View>
+        </View>}
       </ScrollView>
 
       {/* Main Video URL Input Modal */}
