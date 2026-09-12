@@ -64,14 +64,24 @@ export function soundCloudWidgetHTML(url: string): string {
 <iframe id="music" title="SoundCloud music" allow="autoplay" src="${src}"></iframe>
 <script>
 var widget, ready = false;
-function report(type) {
-  var data = JSON.stringify({ source: "elevator-soundcloud", type: type });
+function report(type, value) {
+  var payload = { source: "elevator-soundcloud", type: type };
+  if (typeof value !== "undefined") payload.value = value;
+  var data = JSON.stringify(payload);
   if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(data);
   else window.parent.postMessage(data, "*");
 }
 window.musicCommand = function(command) {
   if (!ready) return;
-  if (command.type === "volume" && Number.isFinite(command.value)) widget.setVolume(Math.max(0, Math.min(100, command.value)));
+  if (command.type === "volume" && Number.isFinite(command.value)) {
+    var requestedVolume = Math.max(0, Math.min(100, command.value));
+    widget.setVolume(requestedVolume);
+    if (typeof widget.getVolume === "function") {
+      widget.getVolume(function(actualVolume) {
+        report("volume", actualVolume);
+      });
+    }
+  }
   if (command.type === "toggle") widget.toggle();
   if (command.type === "next") widget.next();
   if (command.type === "previous") widget.prev();

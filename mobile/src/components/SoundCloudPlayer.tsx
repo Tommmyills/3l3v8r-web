@@ -19,6 +19,7 @@ export const SoundCloudPlayer = forwardRef<SoundCloudPlayerRef, Props>(({ url, v
   const webView = useRef<WebView>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const [error, setError] = useState(false);
+  const [reportedVolume, setReportedVolume] = useState<number | null>(null);
   const latest = useRef({ volume, onPlayingChange });
   latest.current = { volume, onPlayingChange };
   const source = useMemo(() => ({ html: soundCloudWidgetHTML(url) }), [url]);
@@ -42,6 +43,9 @@ export const SoundCloudPlayer = forwardRef<SoundCloudPlayerRef, Props>(({ url, v
       const data = JSON.parse(raw);
       if (data.source !== "elevator-soundcloud") return;
       if (data.type === "ready") send("volume", latest.current.volume);
+      if (data.type === "volume" && Number.isFinite(data.value)) {
+        setReportedVolume(data.value);
+      }
       if (data.type === "playing") {
         send("volume", latest.current.volume);
         latest.current.onPlayingChange(true);
@@ -73,6 +77,25 @@ export const SoundCloudPlayer = forwardRef<SoundCloudPlayerRef, Props>(({ url, v
         onError={() => setError(true)} style={{ flex: 1 }} />
     )}
     {error && <Text accessibilityRole="alert" style={{ color: "#FF9A5A", padding: 8 }}>SoundCloud could not load. For a private playlist, use its full secret link or Share → Embed code. You can keep it private.</Text>}
+    {Platform.OS !== "web" && reportedVolume !== null && (
+      <Text
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          right: 6,
+          bottom: 6,
+          color: "#FF9A5A",
+          backgroundColor: "rgba(0,0,0,0.75)",
+          paddingHorizontal: 5,
+          paddingVertical: 2,
+          fontFamily: "monospace",
+          fontSize: 9,
+          zIndex: 20,
+        }}
+      >
+        SC VOL ACK: {Math.round(reportedVolume)}
+      </Text>
+    )}
   </View>;
 });
 SoundCloudPlayer.displayName = "SoundCloudPlayer";

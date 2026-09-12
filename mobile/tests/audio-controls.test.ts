@@ -48,7 +48,13 @@ function widgetHarness(native = false) {
   const iframe = {};
   let toggles = 0;
   let messageHandler: (event: { source: unknown; data: unknown }) => void = () => {};
-  const widget = { setVolume: (volume: number) => calls.push(volume), toggle: () => toggles++, bind: (name: string, fn: () => void) => { events[name] = fn; } };
+  let currentVolume = 100;
+  const widget = {
+    setVolume: (volume: number) => { calls.push(volume); currentVolume = volume; },
+    getVolume: (callback: (volume: number) => void) => callback(currentVolume),
+    toggle: () => toggles++,
+    bind: (name: string, fn: () => void) => { events[name] = fn; },
+  };
   const Widget = Object.assign((element: unknown) => { assert.equal(element, iframe); return widget; }, { Events: { READY: "ready", PLAY: "play", PAUSE: "pause", FINISH: "finish", ERROR: "error" } });
   const parent = { postMessage: (raw: string) => messages.push(raw) };
   const window = {
@@ -92,7 +98,8 @@ test("native bridge reports playback and accepts direct widget commands", () => 
   h.events.play();
   h.events.pause();
   assert.deepEqual(h.calls, [17]);
-  assert.deepEqual(h.messages.map(raw => JSON.parse(raw).type), ["ready", "playing", "paused"]);
+  assert.deepEqual(h.messages.map(raw => JSON.parse(raw).type), ["ready", "volume", "playing", "paused"]);
+  assert.equal(JSON.parse(h.messages[1]).value, 17);
 });
 
 test("widget embeds official API, disables single-active behavior, and escapes input", () => {
