@@ -27,7 +27,8 @@
       "expo-mail-composer",
       "expo-secure-store",
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-audio"
     ]
   }
 }

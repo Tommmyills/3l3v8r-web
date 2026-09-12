@@ -6,7 +6,7 @@ You can use this function to transcribe audio files, and it will return the text
 
 /**
  * Transcribe an audio file
- * @param localAudioUri - The local URI of the audio file to transcribe. Obtained via the expo-av library.
+ * @param localAudioUri - The local URI of the audio file to transcribe. Obtained from the local audio file picker.
  * @returns The text of the audio file
  */
 export const transcribeAudio = async (localAudioUri: string) => {
