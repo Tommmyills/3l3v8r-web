@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "vibecode",
+    "name": "3L3V8R",
     "slug": "vibecode",
     "scheme": "vibecode",
     "version": "1.0.0",
@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.clubsodapapi.3l3v8r",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "icon": "./assets/3L3V8R_AppIcon_1024.png"
     },
     "android": {},
     "extra": {
@@ -29,6 +30,7 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-audio"
-    ]
+    ],
+    "icon": "./assets/3L3V8R_AppIcon_1024.png"
   }
 }
