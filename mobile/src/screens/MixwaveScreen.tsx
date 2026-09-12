@@ -171,6 +171,10 @@ export const MixwaveScreen: React.FC = () => {
   // Track Player State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTrack, setCurrentTrack] = useState<string>("");
+  const [localQueue, setLocalQueue] = useState<DocumentPicker.DocumentPickerAsset[]>([]);
+  const [localTrackIndex, setLocalTrackIndex] = useState(-1);
+  const localQueueRef = useRef<DocumentPicker.DocumentPickerAsset[]>([]);
+  const localTrackIndexRef = useRef(-1);
   const audioRef = useRef<AudioPlayer | null>(null);
 
   // Video error state
@@ -251,7 +255,17 @@ export const MixwaveScreen: React.FC = () => {
   musicVolumeRef.current = musicVolume;
 
   // Get current mode colors
-  const modeColors = getModeColors(audioMode);
+  const classicModeColors = getModeColors(audioMode);
+
+  // Hardware UI always uses the permanent 3L3V8R burnt-orange theme.
+  // Classic UI keeps Focus / Study / Chill / Flow / Deep colors.
+  const modeColors = isHardware
+    ? {
+        accent: "#F26432",
+        bg: "#F2643212",
+        glow: "#FF7A45",
+      }
+    : classicModeColors;
 
   const setupAudio = async () => {
     if (Platform.OS === "web") return;
@@ -546,11 +560,110 @@ export const MixwaveScreen: React.FC = () => {
     }
   }, [setMainVideoPlaying, startYoutubeProgressTracking, stopYoutubeProgressTracking, mainVideo.isPlaying, loadingLogoOpacity]);
 
-  // Handle Local MP3 Selection
-  const isPickingAudio = useRef(false); // Prevent multiple simultaneous picker calls
+  // Handle local music playlists
+  const isPickingAudio = useRef(false);
+
+  async function loadLocalTrack(index: number, autoplay = true) {
+    const queue = localQueueRef.current;
+    const file = queue[index];
+    if (!file) return;
+
+    await cleanupAudio();
+    const generation = audioGeneration.current;
+
+    setMusicError("");
+    setIsPlaying(false);
+    setAudioDuration(0);
+    setAudioCurrentTime(0);
+    setCurrentTrack(file.name);
+    setLocalTrackIndex(index);
+    localTrackIndexRef.current = index;
+
+    const objectUrl =
+      Platform.OS === "web" && file.file
+        ? URL.createObjectURL(file.file)
+        : null;
+
+    audioObjectUrl.current = objectUrl;
+
+    try {
+      const sound = createAudioPlayer(
+        { uri: objectUrl ?? file.uri },
+        { updateInterval: 1000 }
+      );
+
+      sound.volume = musicVolumeRef.current / 100;
+      sound.loop = false;
+
+      if (generation !== audioGeneration.current) {
+        sound.remove();
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      audioRef.current = sound;
+
+      const progressInterval = setInterval(() => {
+        if (generation !== audioGeneration.current) {
+          clearInterval(progressInterval);
+          return;
+        }
+
+        if (sound.duration > 0) {
+          setAudioDuration(sound.duration);
+        }
+
+        setAudioCurrentTime(sound.currentTime);
+
+        if (
+          !sound.playing &&
+          sound.duration > 0 &&
+          sound.currentTime >= sound.duration - 0.25
+        ) {
+          clearInterval(progressInterval);
+
+          const nextIndex = index + 1;
+          if (nextIndex < localQueueRef.current.length) {
+            void loadLocalTrack(nextIndex, true);
+          } else {
+            setIsPlaying(false);
+            setAudioCurrentTime(0);
+          }
+        }
+      }, 1000);
+
+      if (sound.duration > 0) {
+        setAudioDuration(sound.duration);
+      }
+
+      if (autoplay) {
+        sound.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error("Failed to load audio file:", error);
+
+      let userMessage = "Could not load this audio file.";
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (
+        errorMessage.includes("-11800") ||
+        errorMessage.includes("AVFoundationErrorDomain")
+      ) {
+        userMessage =
+          "This audio file format is not supported or the file is corrupted. Try another MP3, AAC/M4A, or WAV file.";
+      } else if (errorMessage.includes("1685348671")) {
+        userMessage =
+          "The audio file could not be decoded. Try converting it to a standard MP3 or AAC file.";
+      }
+
+      setMusicError(userMessage);
+      setIsPlaying(false);
+    }
+  }
 
   const handlePickLocalMusic = async () => {
-    // Prevent multiple simultaneous picker calls
     if (isPickingAudio.current) {
       console.log("Document picker already open, ignoring request");
       return;
@@ -558,118 +671,70 @@ export const MixwaveScreen: React.FC = () => {
 
     try {
       isPickingAudio.current = true;
-      const selectionGeneration = audioGeneration.current;
       setMusicError("");
 
       const result = await DocumentPicker.getDocumentAsync({
         type: "audio/*",
         copyToCacheDirectory: true,
         base64: false,
-        multiple: false,
+        multiple: true,
       });
 
-      if (result.canceled === false && result.assets && result.assets[0]) {
-        if (selectionGeneration !== audioGeneration.current) return;
-        const file = result.assets[0];
+      if (
+        result.canceled === false &&
+        result.assets &&
+        result.assets.length > 0
+      ) {
+        const tracks = result.assets;
 
-        console.log("Selected audio file:", file.name, "URI:", file.uri, "Size:", file.size);
-
-        await cleanupAudio();
-        const generation = selectionGeneration + 1;
-        if (generation !== audioGeneration.current) return;
-        setCurrentTrack("");
-        setIsPlaying(false);
-        setAudioDuration(0);
-        setAudioCurrentTime(0);
-        const objectUrl = Platform.OS === "web" && file.file ? URL.createObjectURL(file.file) : null;
-        audioObjectUrl.current = objectUrl;
-
-        // Load audio with more permissive settings
-        console.log("Loading audio file...");
-        const sound = createAudioPlayer(
-          { uri: objectUrl ?? file.uri },
-          { updateInterval: 1000 }
+        console.log(
+          "Selected audio playlist:",
+          tracks.map((track) => track.name)
         );
 
-        sound.volume = musicVolumeRef.current / 100;
-        sound.loop = false;
+        localQueueRef.current = tracks;
+        setLocalQueue(tracks);
+        localTrackIndexRef.current = 0;
+        setLocalTrackIndex(0);
 
-        const progressInterval = setInterval(() => {
-          if (generation !== audioGeneration.current) {
-            clearInterval(progressInterval);
-            return;
-          }
+        await loadLocalTrack(0, true);
 
-          if (sound.duration > 0) {
-            setAudioDuration(sound.duration);
-          }
-
-          setAudioCurrentTime(sound.currentTime);
-
-          if (!sound.playing && sound.duration > 0 && sound.currentTime >= sound.duration - 0.25) {
-            setIsPlaying(false);
-            setAudioCurrentTime(0);
-            clearInterval(progressInterval);
-          }
-        }, 1000);
-
-        if (generation !== audioGeneration.current) {
-          clearInterval(progressInterval);
-          sound.remove();
-          if (objectUrl) URL.revokeObjectURL(objectUrl);
-          return;
-        }
-        audioRef.current = sound;
-        sound.volume = musicVolumeRef.current / 100;
-        setCurrentTrack(file.name);
-
-        // Get duration with error handling
-        try {
-          if (sound.duration > 0) {
-            setAudioDuration(sound.duration);
-            console.log("Audio duration:", sound.duration, "seconds");
-          } else {
-            // For very long files, duration might not be immediately available
-            setAudioDuration(3600);
-          }
-        } catch (durationError) {
-          console.log("Could not get duration, using placeholder");
-          setAudioDuration(3600);
-        }
-
-        if (generation !== audioGeneration.current) return;
-        // Browsers may require a second tap after the asynchronous file picker.
-        sound.play();
-        if (generation !== audioGeneration.current) return;
-        setIsPlaying(true);
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        );
       }
     } catch (error) {
-      console.error("Failed to load audio file:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Failed to select audio files:", error);
 
-      // Ignore "Different document picking in progress" errors (already handled)
-      if (errorMessage.includes("Different document picking in progress")) {
-        console.log("Picker already open, ignoring duplicate call");
-        return;
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      if (!errorMessage.includes("Different document picking in progress")) {
+        setMusicError("Could not load the selected audio files.");
       }
-
-      // Provide more specific error messages
-      let userMessage = "Could not load this audio file.";
-
-      if (errorMessage.includes("-11800") || errorMessage.includes("AVFoundationErrorDomain")) {
-        userMessage = "This audio file format is not supported or the file is corrupted. Please try:\n\n• Converting to standard MP3 (44.1kHz, 128-320kbps)\n• Using a different audio file\n• Checking if the file plays in other apps";
-      } else if (errorMessage.includes("1685348671")) {
-        userMessage = "The audio file could not be decoded. The file may be using an unsupported codec or bitrate. Try converting to a standard MP3 format.";
-      }
-
-      setMusicError(userMessage);
-      if (!audioRef.current) await cleanupAudio();
     } finally {
-      // Always reset the picker flag
       isPickingAudio.current = false;
     }
+  };
+
+  const playPreviousLocalTrack = async () => {
+    const queue = localQueueRef.current;
+    if (!queue.length) return;
+
+    const current = localTrackIndexRef.current;
+    const previous = current <= 0 ? queue.length - 1 : current - 1;
+
+    await loadLocalTrack(previous, true);
+  };
+
+  const playNextLocalTrack = async () => {
+    const queue = localQueueRef.current;
+    if (!queue.length) return;
+
+    const current = localTrackIndexRef.current;
+    const next = current >= queue.length - 1 ? 0 : current + 1;
+
+    await loadLocalTrack(next, true);
   };
 
   // Seek local audio
@@ -703,8 +768,14 @@ export const MixwaveScreen: React.FC = () => {
   const clearMusicSource = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await cleanupAudio();
+    localQueueRef.current = [];
+    localTrackIndexRef.current = -1;
+    setLocalQueue([]);
+    setLocalTrackIndex(-1);
     setCurrentTrack("");
     setIsPlaying(false);
+    setAudioDuration(0);
+    setAudioCurrentTime(0);
     setMusicError("");
     setSoundCloudUrl("");
     setSoundCloudLoading(false);
@@ -2151,7 +2222,7 @@ export const MixwaveScreen: React.FC = () => {
                   >
                     {[
                       { id: "soundcloud", label: "SNDCLD", icon: "cloud-outline", color: "#FF5500" },
-                      { id: "local", label: "LOCAL MP3", icon: "musical-notes", color: modeColors.accent },
+                      { id: "local", label: "MY MUSIC", icon: "musical-notes", color: modeColors.accent },
                       { id: "mixcloud", label: "MIXCLOUD", icon: "cloud", color: "#FF7F00" },
                       { id: "bandcamp", label: "BNDCP", icon: "radio", color: "#1DA0C3" },
                       { id: "apple-music", label: "APPLE", icon: "logo-apple", color: "#FC3C44" },
@@ -2259,11 +2330,42 @@ export const MixwaveScreen: React.FC = () => {
                       {/* Spacer to push buttons to bottom */}
                       <View style={{ flex: 1 }} />
 
-                      {/* Heavily Dimmed Pill Buttons at Bottom */}
-                      <View className="flex-row justify-center pb-2" style={{ gap: 12 }}>
+                      <Text
+                        style={{
+                          textAlign: "center",
+                          color: "#8f9398",
+                          fontFamily: "monospace",
+                          fontSize: 10,
+                          marginBottom: 10,
+                          letterSpacing: 1.5,
+                        }}
+                      >
+                        {localQueue.length > 0
+                          ? `TRACK ${localTrackIndex + 1} / ${localQueue.length}`
+                          : ""}
+                      </Text>
+
+                      <View
+                        className="flex-row justify-center pb-2"
+                        style={{ gap: 8 }}
+                      >
+                        <Pressable
+                          onPress={playPreviousLocalTrack}
+                          className="rounded-full px-4 py-3"
+                          style={{
+                            backgroundColor: "rgba(255,255,255,0.12)",
+                            borderWidth: 1,
+                            borderColor: "rgba(255,255,255,0.2)",
+                          }}
+                        >
+                          <Text style={{ color: "#bbb", fontFamily: "monospace", fontSize: 11 }}>
+                            ◀ PREV
+                          </Text>
+                        </Pressable>
+
                         <Pressable
                           onPress={togglePlayback}
-                          className="rounded-full px-8 py-3"
+                          className="rounded-full px-5 py-3"
                           style={{
                             backgroundColor: modeColors.accent,
                             opacity: 0.70,
@@ -2274,38 +2376,48 @@ export const MixwaveScreen: React.FC = () => {
                           }}
                         >
                           <Text
-                            className="text-xs font-bold tracking-widest"
                             style={{
                               fontFamily: "monospace",
                               color: "#000",
-                              letterSpacing: 2,
+                              fontSize: 11,
+                              fontWeight: "700",
+                              letterSpacing: 1,
                             }}
                           >
                             {isPlaying ? "PAUSE" : "PLAY"}
                           </Text>
                         </Pressable>
+
                         <Pressable
-                          onPress={handlePickLocalMusic}
-                          className="rounded-full px-8 py-3"
+                          onPress={playNextLocalTrack}
+                          className="rounded-full px-4 py-3"
                           style={{
                             backgroundColor: "rgba(255,255,255,0.12)",
                             borderWidth: 1,
                             borderColor: "rgba(255,255,255,0.2)",
-                            opacity: 0.65,
                           }}
                         >
-                          <Text
-                            className="text-xs font-bold tracking-widest"
-                            style={{
-                              fontFamily: "monospace",
-                              color: "#bbb",
-                              letterSpacing: 2,
-                            }}
-                          >
-                            CHANGE
+                          <Text style={{ color: "#bbb", fontFamily: "monospace", fontSize: 11 }}>
+                            NEXT ▶
                           </Text>
                         </Pressable>
                       </View>
+
+                      <Pressable
+                        onPress={handlePickLocalMusic}
+                        style={{ alignSelf: "center", paddingHorizontal: 12, paddingVertical: 6 }}
+                      >
+                        <Text
+                          style={{
+                            color: "#777",
+                            fontFamily: "monospace",
+                            fontSize: 9,
+                            letterSpacing: 1.5,
+                          }}
+                        >
+                          LOAD NEW PLAYLIST
+                        </Text>
+                      </Pressable>
                     </>
                   ) : (
                     <View className="flex-1 items-center justify-center">
@@ -2329,7 +2441,7 @@ export const MixwaveScreen: React.FC = () => {
                             letterSpacing: 3,
                           }}
                         >
-                          SELECT MP3
+                          SELECT MUSIC
                         </Text>
                       </Pressable>
                     </View>
