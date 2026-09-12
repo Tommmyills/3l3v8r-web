@@ -68,6 +68,12 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedText = Animated.createAnimatedComponent(Text);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
+// V1 release mode:
+// Show only YouTube + local MY MUSIC.
+// Full SoundCloud / Mixcloud / Bandcamp / Apple / Spotify /
+// Transcript / AI / Translator features remain preserved in code and Git.
+const V1_SIMPLE_MODE = true;
+
 // Mode color mapping - softer, more subtle
 const getModeColors = (mode: AudioMode) => {
   switch (mode) {
@@ -1801,6 +1807,7 @@ export const MixwaveScreen: React.FC = () => {
 
                   {tutorialExpanded && (
                     <View>
+                  {!V1_SIMPLE_MODE && (
                   {/* Notes Button */}
                   <Pressable
                     onPress={() => {
@@ -1948,6 +1955,7 @@ export const MixwaveScreen: React.FC = () => {
 
                     </View>
                   )}
+                  )}
                   {/* Expanded Advanced Controls */}
                   {tutorialExpanded && (
                     <View className="mt-4 pt-4 border-t" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
@@ -2043,7 +2051,8 @@ export const MixwaveScreen: React.FC = () => {
                             color={loopEnabled ? modeColors.accent : "#666"}
                           />
                         </Pressable>
-                        <Pressable
+                        {!V1_SIMPLE_MODE && (
+<Pressable
                           onPress={() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             setShowTranscript(true);
@@ -2059,6 +2068,7 @@ export const MixwaveScreen: React.FC = () => {
                           </Text>
                           <Ionicons name="document-text" size={14} color="#666" />
                         </Pressable>
+                        )}
                         <Pressable
                           onPress={() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -2227,7 +2237,7 @@ export const MixwaveScreen: React.FC = () => {
                       { id: "bandcamp", label: "BNDCP", icon: "radio", color: "#1DA0C3" },
                       { id: "apple-music", label: "APPLE", icon: "logo-apple", color: "#FC3C44" },
                       { id: "spotify", label: "SPOTIFY", icon: "musical-note", color: "#1DB954" },
-                    ].map((source) => (
+                    ].filter((source) => !V1_SIMPLE_MODE || source.id === "local").map((source) => (
                       <Pressable
                         key={source.id}
                         onPress={async () => {
@@ -2242,7 +2252,7 @@ export const MixwaveScreen: React.FC = () => {
                         style={isHardware ? [
                           hardwareRaisedButton(source.id === musicSource),
                           {
-                            width: "31%",
+                            width: V1_SIMPLE_MODE ? "100%" : "31%",
                             minWidth: 96,
                             minHeight: 92,
                             flexGrow: 1,
