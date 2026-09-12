@@ -68,10 +68,8 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedText = Animated.createAnimatedComponent(Text);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-// V1 release mode:
-// Show only YouTube + local MY MUSIC.
-// Full SoundCloud / Mixcloud / Bandcamp / Apple / Spotify /
-// Transcript / AI / Translator features remain preserved in code and Git.
+// V1: YouTube + local MY MUSIC only.
+// Full integrations remain preserved in Git.
 const V1_SIMPLE_MODE = true;
 
 // Mode color mapping - softer, more subtle
@@ -1806,8 +1804,7 @@ export const MixwaveScreen: React.FC = () => {
                   </View>
 
                   {tutorialExpanded && (
-                    <View>
-                  {!V1_SIMPLE_MODE && (
+                    <View style={{ display: V1_SIMPLE_MODE ? "none" : "flex" }}>
                   {/* Notes Button */}
                   <Pressable
                     onPress={() => {
@@ -1866,6 +1863,7 @@ export const MixwaveScreen: React.FC = () => {
                     <Text
                       className="text-xs font-semibold tracking-wider"
                       style={{
+                              display: V1_SIMPLE_MODE ? "none" : "flex",
                         letterSpacing: 0.5,
                         color: modeColors.accent,
                       }}
@@ -1954,7 +1952,6 @@ export const MixwaveScreen: React.FC = () => {
                   </Pressable>
 
                     </View>
-                  )}
                   )}
                   {/* Expanded Advanced Controls */}
                   {tutorialExpanded && (
@@ -2051,8 +2048,7 @@ export const MixwaveScreen: React.FC = () => {
                             color={loopEnabled ? modeColors.accent : "#666"}
                           />
                         </Pressable>
-                        {!V1_SIMPLE_MODE && (
-<Pressable
+                        <Pressable
                           onPress={() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             setShowTranscript(true);
@@ -2068,7 +2064,6 @@ export const MixwaveScreen: React.FC = () => {
                           </Text>
                           <Ionicons name="document-text" size={14} color="#666" />
                         </Pressable>
-                        )}
                         <Pressable
                           onPress={() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -2080,7 +2075,8 @@ export const MixwaveScreen: React.FC = () => {
                             backgroundColor: "rgba(0,0,0,0.3)",
                           }}
                         >
-                          <Text className="text-xs text-gray-400" style={{ letterSpacing: 0.3 }}>
+                          <Text className="text-xs text-gray-400" style={{
+                              display: V1_SIMPLE_MODE ? "none" : "flex", letterSpacing: 0.3 }}>
                             AI Chat
                           </Text>
                           <Ionicons name="chatbubbles" size={14} color="#666" />
