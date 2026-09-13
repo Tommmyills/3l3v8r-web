@@ -656,7 +656,7 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
 
   const gridMove = grid.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 22],
+    outputRange: [0, 54],
   });
 
   const logoScale = pulse.interpolate({
@@ -816,7 +816,7 @@ export const SynthwaveIdleDisplayV2 = () => {
     const gridLoop = Animated.loop(
       Animated.timing(grid, {
         toValue: 1,
-        duration: 2500,
+        duration: 1600,
         useNativeDriver: true,
       })
     );
