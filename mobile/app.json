@@ -29,7 +29,15 @@
       "expo-secure-store",
       "expo-sharing",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/3L3V8R_Splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#101010"
+        }
+      ]
     ],
     "icon": "./assets/3L3V8R_AppIcon_1024.png"
   }
