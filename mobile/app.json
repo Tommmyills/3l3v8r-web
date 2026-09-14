@@ -6,6 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#020207",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.clubsodapapi.3l3v8r",
@@ -33,9 +34,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/3L3V8R_Splash.png",
-          "resizeMode": "cover",
-          "backgroundColor": "#101010"
+          "backgroundColor": "#020207"
         }
       ]
     ],

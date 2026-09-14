@@ -1,6 +1,14 @@
 import React from "react";
 import { Animated, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Reanimated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import type { AudioMode } from "../state/appStore";
 
 export const hardwarePalette = {
@@ -617,57 +625,30 @@ export const SynthwaveMediaIdleDisplay = () => {
 };
 
 
-export const SynthwaveMediaIdleDisplayV2 = () => {
-  const grid = React.useRef(new Animated.Value(0)).current;
-  const pulse = React.useRef(new Animated.Value(0)).current;
+export const SynthwaveMediaIdleDisplayV2 = ({ opening = false }: { opening?: boolean }) => {
+  const grid = useSharedValue(0);
+  const pulse = useSharedValue(0);
 
   React.useEffect(() => {
-    const gridLoop = Animated.loop(
-      Animated.timing(grid, {
-        toValue: 1,
-        duration: 2400,
-        useNativeDriver: true,
-      })
-    );
-
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 1600,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    gridLoop.start();
-    pulseLoop.start();
+    grid.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.linear }), -1, false);
+    pulse.value = withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }), -1, true);
 
     return () => {
-      gridLoop.stop();
-      pulseLoop.stop();
+      cancelAnimation(grid);
+      cancelAnimation(pulse);
     };
   }, [grid, pulse]);
 
-  const gridMove = grid.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 54],
-  });
-
-  const logoScale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.985, 1.025],
-  });
-
-  const logoOpacity = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.84, 1],
-  });
+  const gridStyle = useAnimatedStyle(() => ({ transform: [{ translateY: grid.value * 72 }] }));
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: 0.84 + pulse.value * 0.16,
+    transform: [{ scale: 0.985 + pulse.value * 0.04 }],
+  }));
+  const starStyle = useAnimatedStyle(() => ({ opacity: 0.4 + pulse.value * 0.45 }));
+  const sunStyle = useAnimatedStyle(() => ({
+    opacity: 0.8 + pulse.value * 0.15,
+    transform: [{ scale: 0.98 + pulse.value * 0.045 }, { translateY: pulse.value * -3 }],
+  }));
 
   return (
     <View
@@ -686,9 +667,9 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
         [79, 24],
         [91, 13],
       ].map(([left, top], i) => (
-        <Animated.View
+        <Reanimated.View
           key={`media-v2-star-${i}`}
-          style={{
+          style={[{
             position: "absolute",
             left: `${left}%`,
             top,
@@ -696,16 +677,29 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
             height: i % 2 ? 2 : 3,
             borderRadius: 3,
             backgroundColor: i % 3 === 0 ? "#d8d9d6" : "#777a78",
-            opacity: pulse.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.25 + i * 0.04, 0.85],
-            }),
-          }}
+          }, starStyle]}
         />
       ))}
 
+      {opening && (
+        <Reanimated.View style={[{
+          position: "absolute",
+          top: "38%",
+          alignSelf: "center",
+          width: 140,
+          height: 140,
+          borderRadius: 70,
+          overflow: "hidden",
+          backgroundColor: "#b7b9b5",
+        }, sunStyle]}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ position: "absolute", top: 58 + i * 14, left: 0, right: 0, height: 5, backgroundColor: "#020207" }} />
+          ))}
+        </Reanimated.View>
+      )}
+
       {/* moving perspective grid */}
-      <Animated.View
+      <View
         style={{
           position: "absolute",
           left: -80,
@@ -713,7 +707,6 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
           bottom: 0,
           height: "45%",
           overflow: "hidden",
-          transform: [{ translateY: gridMove }],
         }}
       >
         {/* vertical perspective lines */}
@@ -737,42 +730,42 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
         ))}
 
         {/* horizontal moving lines */}
-        {Array.from({ length: 13 }).map((_, i) => (
+        <Reanimated.View style={[{ position: "absolute", inset: 0 }, gridStyle]}>
+        {Array.from({ length: 32 }).map((_, i) => (
           <View
             key={`media-v2-h-${i}`}
             style={{
               position: "absolute",
               left: 0,
               right: 0,
-              bottom: i * 18,
+              bottom: (i - 4) * 18,
               height: i % 4 === 0 ? 1.5 : 1,
               backgroundColor: i % 4 === 0 ? "#aeb0ad" : "#555856",
               opacity: 0.82,
             }}
           />
         ))}
-      </Animated.View>
+        </Reanimated.View>
+      </View>
 
       {/* logo */}
-      <Animated.Text
-        style={{
+      <Reanimated.Text
+        style={[{
           position: "absolute",
-          top: "17%",
+          top: opening ? "22%" : "17%",
           alignSelf: "center",
           fontFamily: "Arial Black",
           fontSize: 48,
           fontWeight: "900",
           letterSpacing: 8,
           color: "#e8e9e5",
-          opacity: logoOpacity,
-          transform: [{ scale: logoScale }],
           textShadowColor: "rgba(235,238,232,0.65)",
           textShadowOffset: { width: 0, height: 0 },
           textShadowRadius: 30,
-        }}
+        }, logoStyle]}
       >
         3L3V8R
-      </Animated.Text>
+      </Reanimated.Text>
 
       {/* prompt */}
       <View
@@ -783,7 +776,7 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
           minWidth: 235,
           paddingHorizontal: 30,
           paddingVertical: 15,
-          borderWidth: 1.5,
+          borderWidth: opening ? 0 : 1.5,
           borderStyle: "dashed",
           borderColor: "#8c8f8b",
           borderRadius: 14,
@@ -800,7 +793,7 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
             letterSpacing: 3,
           }}
         >
-          TAP TO LOAD VIDEO
+          {opening ? "ELEVATE YOUR LEARNING" : "TAP TO LOAD VIDEO"}
         </Text>
       </View>
     </View>
@@ -809,51 +802,24 @@ export const SynthwaveMediaIdleDisplayV2 = () => {
 
 
 export const SynthwaveIdleDisplayV2 = () => {
-  const grid = React.useRef(new Animated.Value(0)).current;
-  const pulse = React.useRef(new Animated.Value(0)).current;
+  const grid = useSharedValue(0);
+  const pulse = useSharedValue(0);
 
   React.useEffect(() => {
-    const gridLoop = Animated.loop(
-      Animated.timing(grid, {
-        toValue: 1,
-        duration: 1600,
-        useNativeDriver: true,
-      })
-    );
-
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 1800,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    gridLoop.start();
-    pulseLoop.start();
+    grid.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.linear }), -1, false);
+    pulse.value = withRepeat(withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.ease) }), -1, true);
 
     return () => {
-      gridLoop.stop();
-      pulseLoop.stop();
+      cancelAnimation(grid);
+      cancelAnimation(pulse);
     };
   }, [grid, pulse]);
 
-  const gridMove = grid.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 22],
-  });
-
-  const sunScale = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.98, 1.025],
-  });
+  const gridStyle = useAnimatedStyle(() => ({ transform: [{ translateY: grid.value * 72 }] }));
+  const sunStyle = useAnimatedStyle(() => ({
+    opacity: 0.8 + pulse.value * 0.15,
+    transform: [{ scale: 0.98 + pulse.value * 0.045 }, { translateY: pulse.value * -3 }],
+  }));
 
   return (
     <View
@@ -888,8 +854,8 @@ export const SynthwaveIdleDisplayV2 = () => {
       ))}
 
       {/* pulsing synthwave sun — NO horizon line */}
-      <Animated.View
-        style={{
+      <Reanimated.View
+        style={[{
           position: "absolute",
           top: 28,
           alignSelf: "center",
@@ -897,13 +863,11 @@ export const SynthwaveIdleDisplayV2 = () => {
           height: 120,
           borderRadius: 60,
           backgroundColor: "#b7b9b5",
-          opacity: 0.9,
-          transform: [{ scale: sunScale }],
           shadowColor: "#e5e7e2",
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 0.6,
           shadowRadius: 24,
-        }}
+        }, sunStyle]}
       />
 
       {/* sun stripes */}
@@ -922,7 +886,7 @@ export const SynthwaveIdleDisplayV2 = () => {
       ))}
 
       {/* moving grid only — no orange overlays */}
-      <Animated.View
+      <View
         style={{
           position: "absolute",
           left: -80,
@@ -930,7 +894,6 @@ export const SynthwaveIdleDisplayV2 = () => {
           bottom: 0,
           height: "36%",
           overflow: "hidden",
-          transform: [{ translateY: gridMove }],
         }}
       >
         {[-210, -150, -95, -45, 0, 45, 95, 150, 210].map((x, i) => (
@@ -952,21 +915,23 @@ export const SynthwaveIdleDisplayV2 = () => {
           />
         ))}
 
-        {Array.from({ length: 12 }).map((_, i) => (
+        <Reanimated.View style={[{ position: "absolute", inset: 0 }, gridStyle]}>
+        {Array.from({ length: 32 }).map((_, i) => (
           <View
             key={`sound-v2-h-${i}`}
             style={{
               position: "absolute",
               left: 0,
               right: 0,
-              bottom: i * 18,
+              bottom: (i - 4) * 18,
               height: i % 4 === 0 ? 1.5 : 1,
               backgroundColor: i % 4 === 0 ? "#aeb0ad" : "#555856",
               opacity: 0.82,
             }}
           />
         ))}
-      </Animated.View>
+        </Reanimated.View>
+      </View>
 
       <View
         style={{

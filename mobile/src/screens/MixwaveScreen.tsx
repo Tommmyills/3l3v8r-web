@@ -44,6 +44,7 @@ import { useProfileStore } from "../state/profileStore";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { AudioVisualizer } from "../components/AudioVisualizer";
+import { MusicWaveform } from "../components/MusicWaveform";
 import { VoiceAssistModal } from "../components/VoiceAssistModal";
 import { useVoiceAssistStore } from "../state/voiceAssistStore";
 import { FavoritesScreen } from "./FavoritesScreen";
@@ -2300,15 +2301,17 @@ export const MixwaveScreen: React.FC = () => {
 
             {/* Music Player */}
             <View className="border-b overflow-hidden relative" style={{ minHeight: 220, marginHorizontal: isHardware ? 18 : 0, marginTop: isHardware ? 12 : 0, borderRadius: isHardware ? 12 : 16, backgroundColor: "#121314", borderColor: isHardware ? "#77736e" : "rgba(255,255,255,0.08)", borderWidth: isHardware ? 1 : 0 }}>
-              {/* Audio Visualizer - Behind everything in music player - BRIGHTEST */}
-              {visualizerEnabled && (
+              {/* Decorative visualizer behind the existing playback controls. */}
+              {visualizerEnabled && (musicSource === "local" ? (
+                <MusicWaveform isActive={isPlaying} />
+              ) : (
                 <AudioVisualizer
                   mode={audioMode}
                   audioLevel={channelBGain}
                   isActive={isPlaying}
                   opacity={1}
                 />
-              )}
+              ))}
 
               {musicSource === "local" ? (
                 <View className="flex-1 justify-between py-6 px-6" style={{ zIndex: 2 }}>

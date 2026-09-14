@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavigationContainer } from "@react-navigation/native";
@@ -29,25 +29,15 @@ const openai_api_key = Constants.expoConfig.extra.apikey;
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
-
-  if (showSplash) {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <SplashScreen onFinish={() => setShowSplash(false)} />
-          <StatusBar style="light" />
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
-    );
-  }
+  const finishSplash = useCallback(() => setShowSplash(false), []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#020207" }}>
       <SafeAreaProvider>
-        <NavigationContainer>
+        {showSplash ? <SplashScreen onFinish={finishSplash} /> : <NavigationContainer>
           <MixwaveScreen />
-          <StatusBar style="light" />
-        </NavigationContainer>
+        </NavigationContainer>}
+        <StatusBar style="light" />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

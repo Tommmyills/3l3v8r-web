@@ -6,6 +6,10 @@ import { LogBox } from "react-native";
 LogBox.ignoreLogs(["Expo AV has been deprecated", "Disconnected from Metro"]);
 
 import { registerRootComponent } from "expo";
+import * as NativeSplashScreen from "expo-splash-screen";
+
+// Keep the native launch screen until the branded opening has laid out.
+void NativeSplashScreen.preventAutoHideAsync().catch(() => {});
 
 import App from "./App";
 
