@@ -1,5 +1,5 @@
 import React from "react";
-import { Animated, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Image, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Reanimated, {
   cancelAnimation,
@@ -626,6 +626,9 @@ export const SynthwaveMediaIdleDisplay = () => {
 
 
 export const SynthwaveMediaIdleDisplayV2 = ({ opening = false, hidePrompt = false }: { opening?: boolean; hidePrompt?: boolean }) => {
+  const { width: viewportWidth } = useWindowDimensions();
+  const brandLogoWidth = Math.min(340, Math.max(180, viewportWidth - 74));
+  const brandLogoScale = brandLogoWidth / 714;
   const grid = useSharedValue(0);
   const pulse = useSharedValue(0);
 
@@ -748,24 +751,30 @@ export const SynthwaveMediaIdleDisplayV2 = ({ opening = false, hidePrompt = fals
         </Reanimated.View>
       </View>
 
-      {/* logo */}
-      <Reanimated.Text
+      {/* logo — cropped from the existing app icon to preserve the exact brand lettering */}
+      <Reanimated.View
         style={[{
           position: "absolute",
           top: opening ? "22%" : "17%",
           alignSelf: "center",
-          fontFamily: "Arial Black",
-          fontSize: 48,
-          fontWeight: "900",
-          letterSpacing: 8,
-          color: "#e8e9e5",
-          textShadowColor: "rgba(235,238,232,0.65)",
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: 30,
+          width: brandLogoWidth,
+          height: 190 * brandLogoScale,
+          overflow: "hidden",
         }, logoStyle]}
       >
-        3L3V8R
-      </Reanimated.Text>
+        <Image
+          source={require("../../assets/3L3V8R_AppIcon_1024.png")}
+          resizeMode="stretch"
+          style={{
+            position: "absolute",
+            width: 1024 * brandLogoScale,
+            height: 1024 * brandLogoScale,
+            left: -155 * brandLogoScale,
+            top: -205 * brandLogoScale,
+          }}
+          accessibilityLabel="3L3V8R"
+        />
+      </Reanimated.View>
 
       {/* prompt */}
       {!hidePrompt && <View
