@@ -1394,7 +1394,8 @@ export const MixwaveScreen: React.FC = () => {
                     height={tutorialVideoHeight}
                     play={mainPlaying}
                     videoId={mainVideo.videoId}
-                    volume={mainVideo.isMuted ? 0 : channelAGain}
+                    volume={channelAGain}
+                    mute={mainVideo.isMuted}
                     playbackRate={playbackSpeed}
                     onChangeState={onMainStateChange}
                     onReady={() => {
@@ -1724,6 +1725,7 @@ export const MixwaveScreen: React.FC = () => {
                       onValueChange={(value) => {
                         setMainVideoVolume(value);
                       }}
+                      onSlidingComplete={setMainVideoVolume}
                       onTouchStart={() => {
                         sliderGlowA.value = withSpring(0.6);
                       }}
