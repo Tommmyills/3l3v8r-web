@@ -701,6 +701,7 @@ export const MixwaveScreen: React.FC = () => {
         setLocalQueue(tracks);
         localTrackIndexRef.current = 0;
         setLocalTrackIndex(0);
+        setMusicSource("local");
 
         await loadLocalTrack(0, true);
 
@@ -989,6 +990,8 @@ export const MixwaveScreen: React.FC = () => {
         <AnimatedView
           className="flex-1"
           style={isHardware ? {
+            flex: 1,
+            minHeight: 0,
             borderWidth: 1,
             borderColor: "#aaa69f",
             borderRadius: 18,
@@ -1391,8 +1394,7 @@ export const MixwaveScreen: React.FC = () => {
                     height={tutorialVideoHeight}
                     play={mainPlaying}
                     videoId={mainVideo.videoId}
-                    volume={channelAGain}
-                    mute={mainVideo.isMuted}
+                    volume={mainVideo.isMuted ? 0 : channelAGain}
                     playbackRate={playbackSpeed}
                     onChangeState={onMainStateChange}
                     onReady={() => {
@@ -1546,10 +1548,11 @@ export const MixwaveScreen: React.FC = () => {
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     setShowMainInput(true);
                   }}
+                  disabled={isHardware}
                   style={{ flex: 1 }}
                 >
                   {isHardware ? (
-                    <SynthwaveMediaIdleDisplayV2 />
+                    <SynthwaveMediaIdleDisplayV2 hidePrompt />
                   ) : (
                     <ImageBackground
                       source={require("../../assets/elev8ryoutubeholder-1765124402018.png")}
@@ -1567,12 +1570,12 @@ export const MixwaveScreen: React.FC = () => {
             </View>
 
             {/* Controls */}
-            <View className="p-5" style={{ backgroundColor: isHardware ? hardwarePalette.shellLight : "rgba(255,255,255,0.02)" }}>
-              {isHardware && (showMainInput || !!mainVideo.videoId) && (
+            <View className="p-5" style={{ backgroundColor: isHardware ? "#151617" : "rgba(255,255,255,0.02)" }}>
+              {isHardware && (
                 <View style={{ marginBottom: mainVideo.videoId ? 18 : 0 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 9 }}>
                     <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
-                    <Text style={{ color: hardwarePalette.ink, fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 2 }}>INPUT URL</Text>
+                    <Text style={{ color: "#e8e9e5", fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 2 }}>INPUT URL</Text>
                   </View>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "stretch", gap: 10 }}>
                     <TextInput
@@ -2199,7 +2202,7 @@ export const MixwaveScreen: React.FC = () => {
             </View>
 
             {/* Audio Source Selector - Horizontal */}
-            {(!musicSource || isHardware) && (
+            {!V1_SIMPLE_MODE && (!musicSource || isHardware) && (
               <View
                 className="p-4 border-b"
                 style={{
@@ -2412,7 +2415,7 @@ export const MixwaveScreen: React.FC = () => {
                         </Pressable>
                       </View>
 
-                      <Pressable
+                      {!V1_SIMPLE_MODE && (                      <Pressable
                         onPress={handlePickLocalMusic}
                         style={{ alignSelf: "center", paddingHorizontal: 12, paddingVertical: 6 }}
                       >
@@ -2426,7 +2429,7 @@ export const MixwaveScreen: React.FC = () => {
                         >
                           LOAD NEW PLAYLIST
                         </Text>
-                      </Pressable>
+                      </Pressable>)}
                     </>
                   ) : (
                     <View className="flex-1 items-center justify-center">
@@ -2695,7 +2698,7 @@ export const MixwaveScreen: React.FC = () => {
                 </View>
               ) : (
                 isHardware ? (
-                  <SynthwaveIdleDisplayV2 />
+                  <SynthwaveIdleDisplayV2 hideSun={V1_SIMPLE_MODE} hidePrompt={V1_SIMPLE_MODE} />
                 ) : (
                   <View style={{ zIndex: 2, minHeight: 220, backgroundColor: "#0a0a0a" }}>
                     <View className="flex-1 items-center justify-center p-6">
@@ -2710,6 +2713,18 @@ export const MixwaveScreen: React.FC = () => {
 
             {/* Controls */}
             <View className="p-5" style={{ backgroundColor: isHardware ? "#151617" : "rgba(255,255,255,0.02)", marginHorizontal: isHardware ? 18 : 0, marginBottom: isHardware ? 18 : 0, borderBottomLeftRadius: isHardware ? 12 : 0, borderBottomRightRadius: isHardware ? 12 : 0 }}>
+              {V1_SIMPLE_MODE && (
+                <View style={{ marginBottom: musicSource ? 18 : 0 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 9 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
+                    <Text style={{ color: "#e8e9e5", fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 2 }}>AUDIO FILES</Text>
+                  </View>
+                  <Pressable onPress={handlePickLocalMusic} style={{ minHeight: 50, borderRadius: 7, borderWidth: 1, borderColor: "#d13917", backgroundColor: hardwarePalette.orange, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 18, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 }}>
+                    <Text style={{ color: "#111", fontFamily: "monospace", fontWeight: "900", fontSize: 14, letterSpacing: 2 }}>{musicSource ? "LOAD NEW PLAYLIST" : "CHOOSE AUDIO"}</Text>
+                    <Ionicons name="folder-open-outline" size={18} color="#111" />
+                  </Pressable>
+                </View>
+              )}
               {musicSource ? (
                 <View>
                   {musicError ? <Text accessibilityRole="alert" style={{ color: "#FF9A5A", marginBottom: 12 }}>{musicError}</Text> : null}
@@ -2995,7 +3010,7 @@ export const MixwaveScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
-              ) : (
+              ) : V1_SIMPLE_MODE ? null : (
                 <View className="border border-dashed py-3 rounded-2xl" style={{
                   borderColor: "rgba(255,255,255,0.2)",
                   backgroundColor: "rgba(255,255,255,0.02)",

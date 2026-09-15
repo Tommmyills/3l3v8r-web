@@ -1,101 +1,65 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { useAppStore } from "../state/appStore";
+import { Image, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 interface SplashScreenProps {
   onFinish: () => void;
+  onFadeOut: () => void;
 }
 
-export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  const audioMode = useAppStore((s) => s.audioMode);
-  const [opacity, setOpacity] = useState(0);
-
-  // Get mode color
-  const getModeColor = () => {
-    switch (audioMode) {
-      case "FOCUS":
-        return "#FF7A00";
-      case "STUDY":
-        return "#00E3FF";
-      case "CHILL":
-        return "#8B5CF6";
-      case "FLOW":
-        return "#14B8A6";
-      case "DEEP":
-        return "#EF4444";
-      default:
-        return "#FF7A00";
-    }
-  };
-
-  const neonColor = getModeColor();
+export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish, onFadeOut }) => {
+  const insets = useSafeAreaInsets();
+  const [laidOut, setLaidOut] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const artworkOpacity = useSharedValue(1);
 
   useEffect(() => {
-    // Fade in animation
-    const fadeIn = setTimeout(() => {
-      setOpacity(1);
-    }, 50);
+    if (!laidOut || !imageLoaded) return;
 
-    // Navigate after 2 seconds
-    const timer = setTimeout(() => {
-      onFinish();
-    }, 2000);
-
+    const hold = setTimeout(() => {
+      onFadeOut();
+      artworkOpacity.value = withTiming(0, { duration: 350 });
+    }, 1500);
+    const finish = setTimeout(onFinish, 1850);
     return () => {
-      clearTimeout(fadeIn);
-      clearTimeout(timer);
+      clearTimeout(hold);
+      clearTimeout(finish);
+      cancelAnimation(artworkOpacity);
     };
-  }, [onFinish]);
+  }, [laidOut, imageLoaded, onFinish, onFadeOut, artworkOpacity]);
+
+  const artworkStyle = useAnimatedStyle(() => ({ opacity: artworkOpacity.value }));
 
   return (
-    <View style={styles.container}>
-      <Text
-        style={[
-          styles.logo,
-          {
-            color: neonColor,
-            textShadow: `0 0 30px ${neonColor}, 0 0 60px ${neonColor}, 0 0 90px ${neonColor}`,
-            opacity: opacity,
-            transition: "opacity 1s ease-out",
-          } as any,
-        ]}
-      >
-        3L3V8R
-      </Text>
-      <Text
-        style={[
-          styles.tagline,
-          {
-            color: neonColor,
-            opacity: opacity * 0.5,
-            transition: "opacity 1s ease-out",
-          } as any,
-        ]}
-      >
-        ELEVATE YOUR LEARNING
-      </Text>
+    <View
+      style={{ flex: 1 }}
+      onLayout={() => setLaidOut(true)}
+    >
+      <Animated.View style={[
+        StyleSheet.absoluteFillObject,
+        {
+          backgroundColor: "#e5e4df",
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+        artworkStyle,
+      ]}>
+        <Image
+          source={require("../../assets/3L3V8R_Splash.png")}
+          resizeMode="contain"
+          style={{ flex: 1, width: "100%" }}
+          onLoad={() => setImageLoaded(true)}
+          accessibilityLabel="3L3V8R — Elevate your learning"
+        />
+      </Animated.View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#000000",
-  },
-  logo: {
-    fontFamily: "monospace",
-    fontSize: 52,
-    fontWeight: "bold",
-    letterSpacing: 8,
-  },
-  tagline: {
-    fontFamily: "monospace",
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 6,
-    marginTop: 12,
-  },
-});

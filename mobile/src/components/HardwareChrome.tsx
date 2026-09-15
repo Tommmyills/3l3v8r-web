@@ -625,7 +625,7 @@ export const SynthwaveMediaIdleDisplay = () => {
 };
 
 
-export const SynthwaveMediaIdleDisplayV2 = ({ opening = false }: { opening?: boolean }) => {
+export const SynthwaveMediaIdleDisplayV2 = ({ opening = false, hidePrompt = false }: { opening?: boolean; hidePrompt?: boolean }) => {
   const grid = useSharedValue(0);
   const pulse = useSharedValue(0);
 
@@ -768,7 +768,7 @@ export const SynthwaveMediaIdleDisplayV2 = ({ opening = false }: { opening?: boo
       </Reanimated.Text>
 
       {/* prompt */}
-      <View
+      {!hidePrompt && <View
         style={{
           position: "absolute",
           bottom: "15%",
@@ -795,13 +795,21 @@ export const SynthwaveMediaIdleDisplayV2 = ({ opening = false }: { opening?: boo
         >
           {opening ? "ELEVATE YOUR LEARNING" : "TAP TO LOAD VIDEO"}
         </Text>
-      </View>
+      </View>}
     </View>
   );
 };
 
 
-export const SynthwaveIdleDisplayV2 = () => {
+export const SynthwaveIdleDisplayV2 = ({
+  hideSun = false,
+  hidePrompt = false,
+  onChooseAudio,
+}: {
+  hideSun?: boolean;
+  hidePrompt?: boolean;
+  onChooseAudio?: () => void;
+}) => {
   const grid = useSharedValue(0);
   const pulse = useSharedValue(0);
 
@@ -853,37 +861,38 @@ export const SynthwaveIdleDisplayV2 = () => {
         />
       ))}
 
-      {/* pulsing synthwave sun — NO horizon line */}
-      <Reanimated.View
-        style={[{
-          position: "absolute",
-          top: 28,
-          alignSelf: "center",
-          width: 120,
-          height: 120,
-          borderRadius: 60,
-          backgroundColor: "#b7b9b5",
-          shadowColor: "#e5e7e2",
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.6,
-          shadowRadius: 24,
-        }, sunStyle]}
-      />
-
-      {/* sun stripes */}
-      {[0, 1, 2, 3].map((i) => (
-        <View
-          key={`sound-v2-sunstripe-${i}`}
-          style={{
-            position: "absolute",
-            alignSelf: "center",
-            top: 67 + i * 12,
-            width: 128,
-            height: 5,
-            backgroundColor: "#020207",
-          }}
-        />
-      ))}
+      {!hideSun && (
+        <>
+          <Reanimated.View
+            style={[{
+              position: "absolute",
+              top: 28,
+              alignSelf: "center",
+              width: 120,
+              height: 120,
+              borderRadius: 60,
+              backgroundColor: "#b7b9b5",
+              shadowColor: "#e5e7e2",
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.6,
+              shadowRadius: 24,
+            }, sunStyle]}
+          />
+          {[0, 1, 2, 3].map((i) => (
+            <View
+              key={`sound-v2-sunstripe-${i}`}
+              style={{
+                position: "absolute",
+                alignSelf: "center",
+                top: 67 + i * 12,
+                width: 128,
+                height: 5,
+                backgroundColor: "#020207",
+              }}
+            />
+          ))}
+        </>
+      )}
 
       {/* moving grid only — no orange overlays */}
       <View
@@ -970,7 +979,9 @@ export const SynthwaveIdleDisplayV2 = () => {
         </Text>
       </View>
 
-      <View
+      {!hidePrompt && <Pressable
+        onPress={onChooseAudio}
+        disabled={!onChooseAudio}
         style={{
           position: "absolute",
           alignSelf: "center",
@@ -994,9 +1005,9 @@ export const SynthwaveIdleDisplayV2 = () => {
             letterSpacing: 3,
           }}
         >
-          CHOOSE SOURCE
+          {onChooseAudio ? "CHOOSE AUDIO" : "CHOOSE SOURCE"}
         </Text>
-      </View>
+      </Pressable>}
     </View>
   );
 };
