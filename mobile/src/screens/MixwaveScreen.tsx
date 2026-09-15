@@ -7,6 +7,7 @@ import {
   Keyboard,
   ScrollView,
   TouchableWithoutFeedback,
+  Image,
   ImageBackground,
   Alert,
   Platform,
@@ -66,12 +67,18 @@ import {
 type MusicSource = "local" | "bandcamp" | "mixcloud" | "apple-music" | "soundcloud" | "spotify" | null;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const AnimatedText = Animated.createAnimatedComponent(Text);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 // V1: YouTube + local MY MUSIC only.
 // Full integrations remain preserved in Git.
 const V1_SIMPLE_MODE = true;
+
+const IS_IOS_MEDIA_VOLUME_RESTRICTED =
+  Platform.OS === "ios" ||
+  (Platform.OS === "web" &&
+    typeof navigator !== "undefined" &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)));
 
 // Mode color mapping - softer, more subtle
 const getModeColors = (mode: AudioMode) => {
@@ -112,6 +119,7 @@ export const MixwaveScreen: React.FC = () => {
   // Local UI State
   const [mainUrlInput, setMainUrlInput] = useState("");
   const [showMainInput, setShowMainInput] = useState(false);
+  const [hardwareVideoInputExpanded, setHardwareVideoInputExpanded] = useState(false);
   const [musicSource, setMusicSource] = useState<MusicSource>(null);
   const [visualStyle, setVisualStyle] = useState<"classic" | "hardware">("hardware");
   const isHardware = visualStyle === "hardware";
@@ -477,6 +485,7 @@ export const MixwaveScreen: React.FC = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setMainVideoUrl(mainUrlInput.trim(), videoId);
       setShowMainInput(false);
+      setHardwareVideoInputExpanded(false);
       setMainUrlInput("");
       setVideoError(false); // Reset error state
       setVideoLoading(true); // Show loading overlay immediately when URL is submitted
@@ -1394,8 +1403,8 @@ export const MixwaveScreen: React.FC = () => {
                     height={tutorialVideoHeight}
                     play={mainPlaying}
                     videoId={mainVideo.videoId}
-                    volume={channelAGain}
-                    mute={mainVideo.isMuted}
+                    volume={IS_IOS_MEDIA_VOLUME_RESTRICTED ? 100 : channelAGain}
+                    mute={IS_IOS_MEDIA_VOLUME_RESTRICTED ? false : mainVideo.isMuted}
                     playbackRate={playbackSpeed}
                     onChangeState={onMainStateChange}
                     onReady={() => {
@@ -1523,23 +1532,23 @@ export const MixwaveScreen: React.FC = () => {
                       entering={FadeIn.duration(300)}
                       exiting={FadeOut.duration(500)}
                     >
-                      <AnimatedText
+                      <Animated.Image
+                        source={require("../../assets/3L3V8R_Wordmark_Black.png")}
+                        resizeMode="contain"
                         style={[
                           {
-                            fontFamily: "monospace",
-                            fontSize: 50,
-                            fontWeight: "bold",
-                            letterSpacing: 8,
-                            color: "#FF786A",
-                            textShadowColor: "rgba(255,92,76,0.65)",
-                            textShadowOffset: { width: 0, height: 0 },
-                            textShadowRadius: 22,
+                            width: "88%",
+                            height: "46%",
+                            tintColor: "#FF684F",
+                            shadowColor: "#FF5C4C",
+                            shadowOffset: { width: 0, height: 0 },
+                            shadowOpacity: 0.32,
+                            shadowRadius: 14,
                           },
                           animatedLoadingLogoStyle,
                         ]}
-                      >
-                        3L3V8R
-                      </AnimatedText>
+                        accessibilityLabel="3L3V8R loading"
+                      />
                     </Animated.View>
                   )}
                 </>
@@ -1571,64 +1580,75 @@ export const MixwaveScreen: React.FC = () => {
             </View>
 
             {/* Controls */}
-            <View className="p-5" style={{ backgroundColor: isHardware ? "#151617" : "rgba(255,255,255,0.02)" }}>
-              {isHardware && (
-                <View style={{ marginBottom: mainVideo.videoId ? 18 : 0 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 9 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
-                    <Text style={{ color: "#e8e9e5", fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 2 }}>INPUT URL</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "stretch", gap: 10 }}>
-                    <TextInput
-                      value={mainUrlInput}
-                      onChangeText={setMainUrlInput}
-                      onSubmitEditing={handleLoadMainVideo}
-                      placeholder="Paste a YouTube URL..."
-                      placeholderTextColor="#6e7074"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      style={{
-                        flex: 1,
-                        minWidth: 220,
-                        minHeight: 50,
-                        paddingHorizontal: 18,
-                        borderWidth: 1,
-                        borderColor: "#77746f",
-                        borderRadius: 7,
-                        backgroundColor: "#1c1d1f",
-                        color: "#f5f2ed",
-                        fontFamily: "monospace",
-                        fontSize: 12,
-                        letterSpacing: 0.5,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.24,
-                        shadowRadius: 4,
-                      }}
-                    />
-                    <Pressable
-                      onPress={handleLoadMainVideo}
-                      style={{
-                        minWidth: 140,
-                        minHeight: 50,
-                        borderRadius: 7,
-                        borderWidth: 1,
-                        borderColor: "#d13917",
-                        backgroundColor: hardwarePalette.orange,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexDirection: "row",
-                        gap: 18,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 4,
-                      }}
-                    >
-                      <Text style={{ color: "#111", fontFamily: isHardware ? "Arial Black" : "monospace", fontWeight: "900", fontSize: isHardware ? 15 : 14, letterSpacing: 2 }}>LOAD</Text>
-                      <Ionicons name="arrow-forward" size={18} color="#111" />
-                    </Pressable>
-                  </View>
+            <View style={{
+              padding: isHardware && IS_IOS_MEDIA_VOLUME_RESTRICTED && mainVideo.videoId && !hardwareVideoInputExpanded ? 8 : 20,
+              backgroundColor: isHardware ? "#151617" : "rgba(255,255,255,0.02)",
+            }}>
+              {isHardware && (!mainVideo.videoId || hardwareVideoInputExpanded) && (
+                <View style={{ marginBottom: mainVideo.videoId ? 8 : 0 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 9 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
+                        <Text style={{ color: "#e8e9e5", fontFamily: "monospace", fontSize: 13, fontWeight: "900", letterSpacing: 2 }}>INPUT URL</Text>
+                        {mainVideo.videoId && (
+                          <Pressable
+                            onPress={() => setHardwareVideoInputExpanded(false)}
+                            style={{ marginLeft: "auto", paddingHorizontal: 8, paddingVertical: 4 }}
+                          >
+                            <Text style={{ color: "#8f9398", fontFamily: "monospace", fontSize: 9, letterSpacing: 1.5 }}>CLOSE</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "stretch", gap: 10 }}>
+                        <TextInput
+                          value={mainUrlInput}
+                          onChangeText={setMainUrlInput}
+                          onSubmitEditing={handleLoadMainVideo}
+                          placeholder="Paste a YouTube URL..."
+                          placeholderTextColor="#6e7074"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          style={{
+                            flex: 1,
+                            minWidth: 220,
+                            minHeight: 50,
+                            paddingHorizontal: 18,
+                            borderWidth: 1,
+                            borderColor: "#77746f",
+                            borderRadius: 7,
+                            backgroundColor: "#1c1d1f",
+                            color: "#f5f2ed",
+                            fontFamily: "monospace",
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.24,
+                            shadowRadius: 4,
+                          }}
+                        />
+                        <Pressable
+                          onPress={handleLoadMainVideo}
+                          style={{
+                            minWidth: 140,
+                            minHeight: 50,
+                            borderRadius: 7,
+                            borderWidth: 1,
+                            borderColor: "#d13917",
+                            backgroundColor: hardwarePalette.orange,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexDirection: "row",
+                            gap: 18,
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 4,
+                          }}
+                        >
+                          <Text style={{ color: "#111", fontFamily: isHardware ? "Arial Black" : "monospace", fontWeight: "900", fontSize: isHardware ? 15 : 14, letterSpacing: 2 }}>LOAD</Text>
+                          <Ionicons name="arrow-forward" size={18} color="#111" />
+                        </Pressable>
+                      </View>
                 </View>
               )}
               {!mainVideo.videoId ? (
@@ -1654,6 +1674,95 @@ export const MixwaveScreen: React.FC = () => {
                     INPUT URL
                   </Text>
                 </Pressable>
+              ) : isHardware && IS_IOS_MEDIA_VOLUME_RESTRICTED ? (
+                hardwareVideoInputExpanded ? null : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: 42 }}>
+                    <View style={{ flex: 1, minWidth: 0, paddingLeft: 4 }}>
+                      <Text style={{ color: "#777a78", fontFamily: "monospace", fontSize: 7, letterSpacing: 1.8 }}>
+                        MEDIA / A
+                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: hardwarePalette.orange }} />
+                        <Text style={{ color: "#d7d9d5", fontFamily: "monospace", fontSize: 9, fontWeight: "800", letterSpacing: 1.2 }}>
+                          VIDEO ACTIVE
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Pressable
+                      accessibilityLabel="Load a new video"
+                      onPress={() => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        setHardwareVideoInputExpanded(true);
+                      }}
+                      style={{
+                        minHeight: 36,
+                        paddingHorizontal: 11,
+                        borderWidth: 1,
+                        borderColor: "#be3c1d",
+                        borderRadius: 4,
+                        backgroundColor: hardwarePalette.orange,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 3 },
+                        shadowOpacity: 0.28,
+                        shadowRadius: 3,
+                      }}
+                    >
+                      <Ionicons name="swap-horizontal" size={13} color="#111" />
+                      <Text style={{ color: "#111", fontFamily: "monospace", fontSize: 8, fontWeight: "900", letterSpacing: 1 }}>NEW VIDEO</Text>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityLabel="Favorite video"
+                      onPress={handleToggleFavorite}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderWidth: 1,
+                        borderColor: isFavorite(mainVideo.videoId) ? hardwarePalette.orange : "#555856",
+                        borderRadius: 4,
+                        backgroundColor: "#222325",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons
+                        name={isFavorite(mainVideo.videoId) ? "heart" : "heart-outline"}
+                        size={14}
+                        color={isFavorite(mainVideo.videoId) ? hardwarePalette.orange : "#b8bab7"}
+                      />
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityLabel="Clear video"
+                      onPress={() => {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        clearMainVideo();
+                        setHardwareVideoInputExpanded(false);
+                        setTutorialExpanded(false);
+                        setCurrentVideoTitle("");
+                        setCurrentChannelTitle("");
+                        setCurrentThumbnail("");
+                      }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderWidth: 1,
+                        borderColor: "#555856",
+                        borderRadius: 4,
+                        backgroundColor: "#222325",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Ionicons name="close" size={16} color="#b8bab7" />
+                    </Pressable>
+                  </View>
+                )
               ) : (
                 <View>
                   {/* Simplified Main Controls */}
@@ -1672,7 +1781,7 @@ export const MixwaveScreen: React.FC = () => {
                         />
                       )}
                     </View>
-                    <View className="flex-row items-center" style={{ gap: 8 }}>
+                    {!IS_IOS_MEDIA_VOLUME_RESTRICTED && <View className="flex-row items-center" style={{ gap: 8 }}>
                       <View
                         className="px-3 py-1.5 border rounded-xl"
                         style={{
@@ -1704,11 +1813,11 @@ export const MixwaveScreen: React.FC = () => {
                           color={mainVideo.isMuted ? "#F87171" : modeColors.accent}
                         />
                       </Pressable>
-                    </View>
+                    </View>}
                   </View>
 
                   {/* Volume Slider */}
-                  <Animated.View
+                  {!IS_IOS_MEDIA_VOLUME_RESTRICTED && <Animated.View
                     className="border p-2 rounded-2xl mb-4"
                     style={[{
                       borderColor: "rgba(255,255,255,0.15)",
@@ -1736,7 +1845,7 @@ export const MixwaveScreen: React.FC = () => {
                       maximumTrackTintColor="#1a1a1a"
                       thumbTintColor={modeColors.accent}
                     />
-                  </Animated.View>
+                  </Animated.View>}
 
                   {/* Expand/Clear Row */}
                   <View className="flex-row" style={{ gap: 10 }}>
@@ -2177,7 +2286,7 @@ export const MixwaveScreen: React.FC = () => {
             >
               {isHardware ? (
                 <>
-                  <HardwareSectionTitle title="SOUNDTRACK" detail="SELECT A SOURCE / BUILD YOUR VIBE" />
+                  <HardwareSectionTitle title="" detail="L3V3L UP" lineWidth={42} />
                   <View style={{ marginLeft: 12 }}><HardwareScrew size={12} /></View>
                 </>
               ) : <><Text
@@ -2306,6 +2415,33 @@ export const MixwaveScreen: React.FC = () => {
 
             {/* Music Player */}
             <View className="border-b overflow-hidden relative" style={{ minHeight: 220, marginHorizontal: isHardware ? 18 : 0, marginTop: isHardware ? 12 : 0, borderRadius: isHardware ? 12 : 16, backgroundColor: "#121314", borderColor: isHardware ? "#77736e" : "rgba(255,255,255,0.08)", borderWidth: isHardware ? 1 : 0 }}>
+              {isHardware && musicSource && (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 42,
+                    left: 0,
+                    right: 0,
+                    height: 80,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 0,
+                  }}
+                >
+                  <Image
+                    source={require("../../assets/3L3V8R_Wordmark_Black.png")}
+                    resizeMode="contain"
+                    style={{
+                      width: isMobileLayout ? 280 : 420,
+                      height: 80,
+                      tintColor: "#050607",
+                      opacity: 0.74,
+                    }}
+                    accessibilityLabel="3L3V8R"
+                  />
+                </View>
+              )}
               {/* Decorative visualizer behind the existing playback controls. */}
               {visualizerEnabled && (musicSource === "local" ? (
                 <MusicWaveform isActive={isPlaying} />

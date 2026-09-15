@@ -72,7 +72,7 @@ export const useAppStore = create<AppState>((set) => ({
   musicVideo: {
     url: "",
     videoId: "",
-    volume: 70,
+    volume: 5,
     isPlaying: false,
     isMuted: false,
   },

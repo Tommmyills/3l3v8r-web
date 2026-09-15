@@ -1,5 +1,5 @@
 import React from "react";
-import { Animated, Image, Pressable, Text, useWindowDimensions, View } from "react-native";
+import { Animated, Image, Platform, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Reanimated, {
   cancelAnimation,
@@ -149,7 +149,11 @@ export const HardwareHeader = ({
           <Text
             style={{
               color: hardwarePalette.ink,
-              fontFamily: "Arial Black",
+              fontFamily: Platform.select({
+                ios: "Arial-Black",
+                android: "sans-serif-black",
+                default: "Arial Black",
+              }),
               fontSize: 38,
               fontWeight: "900",
               letterSpacing: 2,
@@ -202,12 +206,12 @@ export const HardwareHeader = ({
   );
 };
 
-export const HardwareSectionTitle = ({ title, detail }: { title: string; detail: string }) => (
+export const HardwareSectionTitle = ({ title, detail, lineWidth = 86 }: { title: string; detail: string; lineWidth?: number }) => (
   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flex: 1 }}>
     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
       <View style={{ width: 11, height: 11, borderRadius: 2, backgroundColor: hardwarePalette.orange, borderWidth: 1, borderColor: "#bd3414" }} />
       <Text style={{ color: hardwarePalette.ink, fontFamily: "monospace", fontWeight: "900", fontSize: 14, letterSpacing: 2 }}>{title}</Text>
-      <View style={{ width: 86, height: 1, backgroundColor: "#8f8b85" }} />
+      <View style={{ width: lineWidth, height: 1, backgroundColor: "#8f8b85" }} />
     </View>
     <Text numberOfLines={1} style={{ color: hardwarePalette.muted, fontFamily: "monospace", fontSize: 8, letterSpacing: 2, flexShrink: 1, textAlign: "right" }}>{detail}</Text>
   </View>
@@ -949,44 +953,59 @@ export const SynthwaveIdleDisplayV2 = ({
           />
         ))}
         </Reanimated.View>
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 40,
+            backgroundColor: "#020207",
+          }}
+        />
       </View>
 
       <View
+        pointerEvents="none"
         style={{
           position: "absolute",
+          top: 8,
           left: 0,
           right: 0,
-          top: 92,
+          height: 90,
           alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        <Text
+        <Image
+          source={require("../../assets/3L3V8R_Wordmark_Black.png")}
+          resizeMode="contain"
           style={{
-            fontFamily: "Arial Black",
-            color: "#e8e9e5",
-            fontSize: 21,
-            fontWeight: "900",
-            letterSpacing: 3,
-            textShadowColor: "#e5e7e2",
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 18,
+            width: "82%",
+            maxWidth: 340,
+            height: 90,
+            opacity: 0.92,
           }}
-        >
-          SOUNDTRACK
-        </Text>
-
-        <Text
-          style={{
-            marginTop: 5,
-            fontFamily: "monospace",
-            color: "#a09da5",
-            fontSize: 10,
-            letterSpacing: 3,
-          }}
-        >
-          NO SOURCE SELECTED
-        </Text>
+          accessibilityLabel="3L3V8R"
+        />
       </View>
+
+      <Text
+        style={{
+          position: "absolute",
+          top: 128,
+          left: 0,
+          right: 0,
+          textAlign: "center",
+          fontFamily: "monospace",
+          color: "#a09da5",
+          fontSize: 10,
+          letterSpacing: 3,
+        }}
+      >
+        NO SOURCE SELECTED
+      </Text>
 
       {!hidePrompt && <Pressable
         onPress={onChooseAudio}
